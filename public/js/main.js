@@ -7,14 +7,12 @@ axios.interceptors.request.use(config => {
     return config;
 });
 
-// Global 401 handler — if token is stale/invalid, auto-logout and redirect
 axios.interceptors.response.use(
     response => response,
     error => {
         if (error.response && error.response.status === 401) {
             const path = window.location.pathname;
             if (path !== '/' && path !== '/index.html') {
-                // Token is invalid — clear and redirect to login
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 window.location.href = '/?expired=1';
@@ -24,10 +22,9 @@ axios.interceptors.response.use(
     }
 );
 
-// Check auth status on page load
 function checkAuth() {
     const token = localStorage.getItem('token');
-    const path  = window.location.pathname;
+    const path = window.location.pathname;
 
     if (!token && path !== '/' && path !== '/index.html') {
         window.location.href = '/';
@@ -36,7 +33,6 @@ function checkAuth() {
     }
 }
 
-// Show a session-expired message on login page if redirected
 function checkExpiredSession() {
     if (window.location.search.includes('expired=1')) {
         setTimeout(() => {
@@ -45,28 +41,31 @@ function checkExpiredSession() {
     }
 }
 
-// Theme toggle
 function initTheme() {
     const theme = localStorage.getItem('theme') || 'light';
-    if (theme === 'dark') {
-        document.body.classList.add('dark-mode');
-    }
+    document.body.classList.toggle('dark-mode', theme === 'dark');
+}
+
+function updateThemeIcon() {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    const dark = document.body.classList.contains('dark-mode');
+    btn.innerHTML = `<i class="fa-solid ${dark ? 'fa-sun' : 'fa-moon'} me-2"></i> ${dark ? 'Light Mode' : 'Dark Mode'}`;
 }
 
 function toggleTheme() {
     document.body.classList.toggle('dark-mode');
     const isDark = document.body.classList.contains('dark-mode');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    updateThemeIcon();
 }
 
-// Logout
 function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/';
 }
 
-// Toast notification helper
 function showToast(message, type = 'success') {
     const toastContainer = document.getElementById('toast-container');
     if (!toastContainer) return;
@@ -84,25 +83,30 @@ function showToast(message, type = 'success') {
 
     toastContainer.insertAdjacentHTML('beforeend', toastHtml);
     const toastEl = toastContainer.lastElementChild;
-    const toast   = new bootstrap.Toast(toastEl, { delay: 3500 });
+    const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
     toast.show();
-
     toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
 
-// Initialize
+document.addEventListener('click', e => {
+    if (e.target.closest('#themeToggle')) {
+        e.preventDefault();
+        toggleTheme();
+    }
+    if (e.target.closest('#logoutBtn')) {
+        e.preventDefault();
+        logout();
+    }
+});
+
+document.addEventListener('mailforge:sidebar-ready', updateThemeIcon);
+
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     checkExpiredSession();
     initTheme();
+    updateThemeIcon();
 
-    const themeBtn = document.getElementById('themeToggle');
-    if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
-
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) logoutBtn.addEventListener('click', e => { e.preventDefault(); logout(); });
-
-    // Display user name in sidebar
     const userNameEl = document.getElementById('userNameDisplay');
     if (userNameEl) {
         const user = JSON.parse(localStorage.getItem('user') || '{}');

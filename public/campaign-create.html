@@ -59,7 +59,12 @@
                     <div class="glass-card p-4 mb-4">
                         <h5 class="mb-3">3. Sender accounts</h5>
                         <div id="senderCheckboxes" class="text-muted">Loading senders...</div>
-                        <a href="/senders.html" class="btn btn-sm btn-outline-primary mt-2">Manage senders</a>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <a href="/senders.html" class="btn btn-sm btn-outline-primary">Manage senders</a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkSenderModal">
+                                <i class="fa-solid fa-file-upload me-1"></i>Bulk import senders
+                            </button>
+                        </div>
                     </div>
 
                     <div class="glass-card p-4">
@@ -93,6 +98,26 @@
                         <button id="createBtn" class="btn btn-primary w-100 mt-3">Create Campaign</button>
                         <button id="createAndStartBtn" class="btn btn-success w-100 mt-2">Create &amp; Start</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bulkSenderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Bulk Import Senders</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p class="small text-muted">CSV/XLSX with columns: Email, AppPassword, Name</p>
+                    <input type="file" id="campaignBulkFile" class="form-control" accept=".csv,.xlsx,.xls">
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="campaignUpdateExisting">
+                        <label class="form-check-label" for="campaignUpdateExisting">Update existing senders</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="campaignBulkImportBtn">Import</button>
                 </div>
             </div>
         </div>
@@ -183,6 +208,29 @@
 
         document.getElementById('createBtn').addEventListener('click', () => createCampaign(false));
         document.getElementById('createAndStartBtn').addEventListener('click', () => createCampaign(true));
+
+        document.getElementById('campaignBulkImportBtn').addEventListener('click', async () => {
+            const file = document.getElementById('campaignBulkFile').files[0];
+            if (!file) return showToast('Select a file', 'error');
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('updateExisting', document.getElementById('campaignUpdateExisting').checked);
+            try {
+                const res = await axios.post('/api/senders/import', fd, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+                showToast(`Imported: ${res.data.added} added, ${res.data.updated} updated`, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('bulkSenderModal')).hide();
+                const sendersRes = await axios.get('/api/senders');
+                senders = sendersRes.data;
+                document.getElementById('senderCheckboxes').innerHTML = senders.map(s =>
+                    `<div class="form-check"><input class="form-check-input sender-cb" type="checkbox" value="${s._id}" id="sender-${s._id}" checked><label class="form-check-label" for="sender-${s._id}">${s.displayName || s.email} &lt;${s.email}&gt;</label></div>`
+                ).join('');
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Import failed', 'error');
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', loadData);
     </script>
 </body>

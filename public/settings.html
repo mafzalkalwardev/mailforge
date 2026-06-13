@@ -26,18 +26,9 @@
                 </div>
             </a>
         </div>
-        <nav class="nav flex-column px-2">
-            <a class="nav-link" href="/dashboard.html"><i class="fa-solid fa-chart-pie me-2"></i> Dashboard</a>
-            <a class="nav-link" href="/single.html"><i class="fa-solid fa-magnifying-glass me-2"></i> Single Verify</a>
-            <a class="nav-link" href="/bulk.html"><i class="fa-solid fa-file-csv me-2"></i> Bulk Verify</a>
-            <a class="nav-link" href="/history.html"><i class="fa-solid fa-clock-rotate-left me-2"></i> History</a>
-            <a class="nav-link active" href="/settings.html"><i class="fa-solid fa-gear me-2"></i> Settings</a>
-            <hr class="text-secondary mx-3">
-            <button id="themeToggle" class="btn btn-link nav-link text-start"><i class="fa-solid fa-moon me-2"></i> Toggle Theme</button>
-            <button id="logoutBtn" class="btn btn-link nav-link text-start text-danger"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</button>
-        </nav>
+        <nav class="nav flex-column px-2"></nav>
         <div class="sidebar-footer">
-            <small class="text-muted">Live-ready v1.1.0</small>
+            <small class="text-muted">MailForge v1.0</small>
         </div>
     </div>
 
@@ -224,16 +215,16 @@
                 const online = d.go || d.reacher;
                 if (d.settings) fillSettingsForm(d.settings);
 
-                if (online && active) {
+                if (online) {
                     el.className = 'engine-status online mb-3';
-                    text.textContent = `Active engine: ${active}`;
+                    text.textContent = active ? `Active engine: ${active}` : 'Verifier online (local)';
                     const parts = [];
-                    if (d.reacher) parts.push(`Reacher ${d.reacher_url || 'configured'} online`);
-                    if (d.go) parts.push(`truemail-go ${d.go_url || 'configured'} online`);
+                    if (d.reacher) parts.push(`Reacher ${d.reacher_url || ''} online`);
+                    if (d.go) parts.push(`truemail-go ${d.go_url || ''} online · SMTP port ${d.smtp_port || 25}`);
                     detail.innerHTML = `
-                        <strong>Mode:</strong> ${d.mode || 'auto'} - verifications use <code>${active}</code>.<br>
-                        ${parts.join(' &middot; ')}<br>
-                        <strong>Live deployment:</strong> Vercel calls the hosted URLs saved below. Localhost engines are only available on this PC.
+                        <strong>Mode:</strong> ${d.mode || 'auto'}${active ? ` — using <code>${active}</code>` : ''}.<br>
+                        ${parts.join(' · ')}<br>
+                        Live SMTP verification is ${d.go ? '<strong class="text-success">ready</strong>' : 'unavailable — start Go verifier with npm start'}.
                     `;
                 } else {
                     el.className = 'engine-status offline mb-3';

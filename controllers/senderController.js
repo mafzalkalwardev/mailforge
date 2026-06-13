@@ -1,6 +1,8 @@
 const SenderAccount = require('../models/SenderAccount');
 const { encrypt } = require('../utils/crypto');
-const { verifySmtp } = require('../utils/smtpClient');
+const { verifySmtp, sendCampaignMessage } = require('../utils/smtpClient');
+const { parseSenderFile } = require('../utils/senderCsvParser');
+const fs = require('fs');
 
 function sanitizeSender(doc) {
     const obj = doc.toObject ? doc.toObject() : { ...doc };
@@ -90,4 +92,87 @@ const testSender = async (req, res) => {
     }
 };
 
-module.exports = { listSenders, createSender, updateSender, deleteSender, testSender };
+const sendTestEmail = async (req, res) => {
+    const { to } = req.body;
+    if (!to || !String(to).includes('@')) {
+        return res.status(400).json({ message: 'Valid "to" email is required' });
+    }
+
+    try {
+        const sender = await SenderAccount.findOne({ _id: req.params.id, user: req.user._id });
+        if (!sender) return res.status(404).json({ message: 'Sender not found' });
+
+        const name = sender.displayName || sender.email;
+        const subject = 'MailForge — test email';
+        const body = `This is a test email from MailForge.\n\nSender: ${sender.email}\nTime: ${new Date().toISOString()}\n\nIf you received this, SMTP sending works correctly.`;
+
+        const messageId = await sendCampaignMessage(sender, to.trim(), subject, body);
+        res.json({ message: `Test email sent to ${to}`, messageId });
+    } catch (error) {
+        res.status(400).json({ message: 'Failed to send test email', error: error.message });
+    }
+};
+
+const bulkImportSenders = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'Upload a CSV or XLSX file' });
+    }
+
+    const filePath = req.file.path;
+    const updateExisting = req.body.updateExisting === 'true' || req.body.updateExisting === true;
+
+    try {
+        const parsed = parseSenderFile(filePath, req.file.originalname);
+        const results = { added: 0, updated: 0, skipped: 0, errors: [] };
+
+        for (const row of parsed) {
+            if (row.error) {
+                results.errors.push({ row: row.row, email: row.email, error: row.error });
+                results.skipped++;
+                continue;
+            }
+
+            const existing = await SenderAccount.findOne({
+                user: req.user._id,
+                email: row.email,
+            });
+
+            if (existing) {
+                if (updateExisting) {
+                    existing.encryptedPassword = encrypt(row.appPassword);
+                    if (row.displayName) existing.displayName = row.displayName;
+                    existing.enabled = true;
+                    await existing.save();
+                    results.updated++;
+                } else {
+                    results.skipped++;
+                }
+                continue;
+            }
+
+            await SenderAccount.create({
+                user: req.user._id,
+                email: row.email,
+                displayName: row.displayName,
+                encryptedPassword: encrypt(row.appPassword),
+            });
+            results.added++;
+        }
+
+        res.json(results);
+    } catch (error) {
+        res.status(400).json({ message: error.message || 'Import failed' });
+    } finally {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+};
+
+module.exports = {
+    listSenders,
+    createSender,
+    updateSender,
+    deleteSender,
+    testSender,
+    sendTestEmail,
+    bulkImportSenders,
+};

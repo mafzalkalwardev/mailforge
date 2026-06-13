@@ -26,8 +26,7 @@
         if (brandTitle) brandTitle.textContent = BRAND;
         if (pageTitle && !pageTitle.textContent.includes(BRAND)) {
             pageTitle.textContent = pageTitle.textContent
-                .replace(/MailOps|Bulk Email Verifier|Email Verifier/gi, BRAND)
-                .replace(/^([^-]+)/, (_, p) => p.trim() === BRAND ? p : p);
+                .replace(/MailOps|Bulk Email Verifier|Email Verifier/gi, BRAND);
         }
 
         if (!nav) return;
@@ -41,20 +40,11 @@
 
         nav.innerHTML = links + `
             <hr class="my-3 opacity-25">
-            <button id="themeToggle" class="btn btn-link nav-link text-start"><i class="fa-solid fa-moon me-2"></i> Toggle Theme</button>
-            <button id="logoutBtn" class="btn btn-link nav-link text-start text-danger"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</button>
+            <button type="button" id="themeToggle" class="btn btn-link nav-link text-start w-100"><i class="fa-solid fa-moon me-2"></i> Toggle Theme</button>
+            <button type="button" id="logoutBtn" class="btn btn-link nav-link text-start text-danger w-100"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</button>
         `;
 
-        document.getElementById('themeToggle')?.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
-        });
-        document.getElementById('logoutBtn')?.addEventListener('click', e => {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/';
-        });
+        document.dispatchEvent(new CustomEvent('mailforge:sidebar-ready'));
     }
 
     document.addEventListener('DOMContentLoaded', renderSidebar);
