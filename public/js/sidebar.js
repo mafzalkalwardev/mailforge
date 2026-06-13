@@ -45,7 +45,35 @@
         `;
 
         document.dispatchEvent(new CustomEvent('mailforge:sidebar-ready'));
+        checkActiveVerifyJob();
     }
+
+    async function checkActiveVerifyJob() {
+        const token = localStorage.getItem('token');
+        if (!token || typeof axios === 'undefined') return;
+        try {
+            const res = await axios.get('/api/verify/jobs/active');
+            let badge = document.getElementById('verifyJobIndicator');
+            if (res.data.active && res.data.job) {
+                const p = res.data.job.progress || {};
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.id = 'verifyJobIndicator';
+                    badge.className = 'px-3 py-2 mx-2 mb-2 rounded-3 small';
+                    badge.style.background = 'rgba(99,102,241,0.15)';
+                    badge.style.border = '1px solid rgba(99,102,241,0.3)';
+                    const nav = document.querySelector('.sidebar nav.nav');
+                    if (nav) nav.insertAdjacentElement('afterend', badge);
+                }
+                badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying ${p.completed}/${p.total} <a href="/bulk.html" class="ms-1">view</a>`;
+                badge.classList.remove('d-none');
+            } else if (badge) {
+                badge.classList.add('d-none');
+            }
+        } catch (_) {}
+    }
+
+    setInterval(checkActiveVerifyJob, 8000);
 
     document.addEventListener('DOMContentLoaded', renderSidebar);
 })();

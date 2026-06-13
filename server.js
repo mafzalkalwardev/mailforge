@@ -8,6 +8,7 @@ const { errorHandler } = require('./middlewares/errorMiddleware');
 const { ensureGoVerifier, stopGoVerifier } = require('./utils/spawnGo');
 const { resetEngineCache } = require('./utils/verificationEngine');
 const { startInboxSync, stopInboxSync } = require('./utils/imapSync');
+const { resumeInterruptedJobs } = require('./utils/bulkVerifyWorker');
 
 dotenv.config();
 
@@ -26,6 +27,8 @@ async function start() {
         await ensureGoVerifier();
         console.log('Starting inbox sync worker...');
         startInboxSync();
+        console.log('Resuming any interrupted verify jobs...');
+        await resumeInterruptedJobs();
     } else {
         console.log('Cloud runtime detected. Use Settings or env vars for hosted verifier URLs.');
     }

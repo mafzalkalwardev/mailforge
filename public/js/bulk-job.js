@@ -1,53 +1,25 @@
 /**
- * Persists bulk verification in sessionStorage — resume after leaving the page.
+ * Tracks active backend verify job id for UI resume.
  */
-const BULK_JOB_KEY = 'bulkVerifyJob';
+const ACTIVE_JOB_KEY = 'mailforgeActiveVerifyJobId';
 
-function saveBulkJob(job) {
+function saveActiveJobId(id) {
     try {
-        sessionStorage.setItem(BULK_JOB_KEY, JSON.stringify(job));
-    } catch (e) {
-        console.warn('Could not save bulk job', e);
-    }
+        if (id) sessionStorage.setItem(ACTIVE_JOB_KEY, id);
+        else sessionStorage.removeItem(ACTIVE_JOB_KEY);
+    } catch (_) {}
 }
 
-function loadBulkJob() {
+function loadActiveJobId() {
     try {
-        const raw = sessionStorage.getItem(BULK_JOB_KEY);
-        return raw ? JSON.parse(raw) : null;
+        return sessionStorage.getItem(ACTIVE_JOB_KEY);
     } catch (_) {
         return null;
     }
 }
 
-function clearBulkJob() {
-    sessionStorage.removeItem(BULK_JOB_KEY);
+function clearActiveJobId() {
+    sessionStorage.removeItem(ACTIVE_JOB_KEY);
 }
 
-function isBulkJobRunning() {
-    const job = loadBulkJob();
-    return job && job.status === 'running';
-}
-
-function guardNavigationWhileRunning() {
-    window.addEventListener('beforeunload', e => {
-        if (isBulkJobRunning()) {
-            e.preventDefault();
-            e.returnValue = 'Bulk verification in progress.';
-        }
-    });
-
-    document.querySelectorAll('.sidebar a.nav-link').forEach(link => {
-        link.addEventListener('click', e => {
-            if (!isBulkJobRunning()) return;
-            const href = link.getAttribute('href');
-            if (!href || href.includes('bulk.html') || link.classList.contains('active')) return;
-            const ok = confirm(
-                'Bulk verification is still running.\n\nLeave this page? Open Bulk Verify again to resume where you left off.'
-            );
-            if (!ok) e.preventDefault();
-        });
-    });
-}
-
-window.BulkJob = { saveBulkJob, loadBulkJob, clearBulkJob, isBulkJobRunning, guardNavigationWhileRunning };
+window.BulkJob = { saveActiveJobId, loadActiveJobId, clearActiveJobId };

@@ -8,6 +8,13 @@ const {
     uploadBulkFile,
     getEngineHealth,
 } = require('../controllers/verifyController');
+const {
+    startJobFromUpload,
+    getActiveJob,
+    getJobById,
+    cancelJob,
+    listRecentJobs,
+} = require('../controllers/verifyJobController');
 const { protect } = require('../middlewares/authMiddleware');
 
 const upload = multer({ dest: process.env.VERCEL ? os.tmpdir() : 'uploads/' });
@@ -17,5 +24,11 @@ router.get('/engine-status', getEngineHealth);
 router.post('/single', protect, verifySingleEmail);
 router.post('/bulk', protect, verifyBulkEmails);
 router.post('/upload-bulk', protect, upload.single('file'), uploadBulkFile);
+
+router.get('/jobs/active', protect, getActiveJob);
+router.get('/jobs/recent', protect, listRecentJobs);
+router.post('/jobs', protect, upload.single('file'), startJobFromUpload);
+router.get('/jobs/:id', protect, getJobById);
+router.post('/jobs/:id/cancel', protect, cancelJob);
 
 module.exports = router;
