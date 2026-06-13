@@ -1,0 +1,50 @@
+const nodemailer = require('nodemailer');
+const { decrypt } = require('./crypto');
+
+function createTransport(sender) {
+    const password = decrypt(sender.encryptedPassword);
+    return nodemailer.createTransport({
+        host: sender.smtpHost || 'smtp.gmail.com',
+        port: sender.smtpPort || 465,
+        secure: (sender.smtpPort || 465) === 465,
+        auth: {
+            user: sender.email,
+            pass: password,
+        },
+        connectionTimeout: 15000,
+    });
+}
+
+async function verifySmtp(sender) {
+    const transport = createTransport(sender);
+    await transport.verify();
+    await transport.close();
+}
+
+async function sendWarmUp(sender) {
+    const transport = createTransport(sender);
+    const name = sender.displayName || sender.email;
+    const info = await transport.sendMail({
+        from: `"${name}" <${sender.email}>`,
+        to: sender.email,
+        subject: 'MailForge — account warm-up',
+        text: 'This is a warm-up message sent before your campaign begins.',
+    });
+    await transport.close();
+    return info.messageId;
+}
+
+async function sendCampaignMessage(sender, to, subject, body) {
+    const transport = createTransport(sender);
+    const name = sender.displayName || sender.email;
+    const info = await transport.sendMail({
+        from: `"${name}" <${sender.email}>`,
+        to,
+        subject,
+        text: body,
+    });
+    await transport.close();
+    return info.messageId || '';
+}
+
+module.exports = { createTransport, verifySmtp, sendWarmUp, sendCampaignMessage };

@@ -1,0 +1,70 @@
+const AppSettings = require('../models/AppSettings');
+
+function cleanUrl(value) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+
+    try {
+        const url = new URL(trimmed);
+        if (!['http:', 'https:'].includes(url.protocol)) return '';
+        return url.toString().replace(/\/$/, '');
+    } catch {
+        return '';
+    }
+}
+
+function defaultSettings() {
+    return {
+        verifierEngine: (process.env.VERIFIER_ENGINE || 'auto').toLowerCase(),
+        goVerifierUrl: cleanUrl(process.env.GO_VERIFIER_URL || 'http://localhost:8082'),
+        reacherUrl: cleanUrl(process.env.REACHER_URL || 'http://localhost:8081'),
+        smtpProxy: process.env.SMTP_PROXY || '',
+        bulkConcurrency: Math.min(parseInt(process.env.BULK_CONCURRENCY || '3', 10), 5),
+        reacherTimeoutMs: parseInt(process.env.REACHER_TIMEOUT_MS || '45000', 10),
+    };
+}
+
+function sanitizeSettings(input = {}) {
+    const defaults = defaultSettings();
+    const allowedEngines = ['auto', 'truemail', 'reacher'];
+    const verifierEngine = String(input.verifierEngine || defaults.verifierEngine || 'auto').toLowerCase();
+    const bulkConcurrency = parseInt(input.bulkConcurrency ?? defaults.bulkConcurrency, 10);
+    const reacherTimeoutMs = parseInt(input.reacherTimeoutMs ?? defaults.reacherTimeoutMs, 10);
+
+    return {
+        verifierEngine: allowedEngines.includes(verifierEngine) ? verifierEngine : 'auto',
+        goVerifierUrl: cleanUrl(input.goVerifierUrl ?? defaults.goVerifierUrl),
+        reacherUrl: cleanUrl(input.reacherUrl ?? defaults.reacherUrl),
+        smtpProxy: String(input.smtpProxy ?? defaults.smtpProxy ?? '').trim(),
+        bulkConcurrency: Number.isFinite(bulkConcurrency) ? Math.min(Math.max(bulkConcurrency, 1), 5) : 3,
+        reacherTimeoutMs: Number.isFinite(reacherTimeoutMs) ? Math.min(Math.max(reacherTimeoutMs, 5000), 180000) : 45000,
+    };
+}
+
+async function getSettingsForUser(userId) {
+    const defaults = defaultSettings();
+    if (!userId) return defaults;
+
+    const saved = await AppSettings.findOne({ user: userId }).lean();
+    if (!saved) return defaults;
+
+    return sanitizeSettings({ ...defaults, ...saved });
+}
+
+async function saveSettingsForUser(userId, input) {
+    const settings = sanitizeSettings(input);
+    const saved = await AppSettings.findOneAndUpdate(
+        { user: userId },
+        { $set: settings },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    return sanitizeSettings(saved);
+}
+
+module.exports = {
+    defaultSettings,
+    getSettingsForUser,
+    saveSettingsForUser,
+    sanitizeSettings,
+};

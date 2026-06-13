@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox - MailOps</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
+    <div class="sidebar glass-card border-start-0 border-top-0 border-bottom-0 rounded-0">
+        <div class="sidebar-brand mb-4">
+            <a href="/dashboard.html" class="brand-link">
+                <img src="/favicon.svg" alt="" class="brand-icon" width="36" height="36">
+                <div class="brand-text"><span class="brand-title">MailOps</span></div>
+            </a>
+        </div>
+        <nav class="nav flex-column px-2"></nav>
+    </div>
+
+    <div class="main-content">
+        <div class="container-fluid py-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold mb-1">Unified Inbox</h2>
+                    <p class="text-muted mb-0"><span id="inboxStats">Loading...</span></p>
+                </div>
+                <button class="btn btn-outline-primary" id="syncBtn"><i class="fa-solid fa-rotate me-2"></i>Sync Now</button>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="glass-card p-3">
+                        <input type="search" id="searchInput" class="form-control mb-3" placeholder="Search inbox...">
+                        <div id="messageList" style="max-height: 600px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="glass-card p-4" id="messageDetail">
+                        <p class="text-muted mb-0">Select a message to read</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="/js/sidebar.js"></script>
+    <script src="/js/main.js"></script>
+    <script>
+        let messages = [];
+
+        async function loadStats() {
+            const res = await axios.get('/api/inbox/stats');
+            document.getElementById('inboxStats').textContent =
+                `${res.data.total} messages · ${res.data.unread} unread · ${res.data.campaignReplies} campaign replies`;
+        }
+
+        async function loadMessages(q = '') {
+            const res = await axios.get('/api/inbox', { params: { q, limit: 100 } });
+            messages = res.data.messages;
+            const list = document.getElementById('messageList');
+            if (!messages.length) {
+                list.innerHTML = '<p class="text-muted small p-2">No messages. Add sender accounts and sync.</p>';
+                return;
+            }
+            list.innerHTML = messages.map(m => `<button type="button" class="list-group-item list-group-item-action text-start border-0 rounded mb-1 ${m.isRead ? '' : 'fw-semibold'} msg-item" data-id="${m._id}">
+                <div class="d-flex justify-content-between"><span class="text-truncate">${m.from || 'Unknown'}</span>
+                <small class="text-muted">${new Date(m.receivedAt).toLocaleDateString()}</small></div>
+                <div class="small text-truncate">${m.subject || '(no subject)'}</div>
+                ${m.campaign ? '<span class="badge bg-info text-dark mt-1">Campaign reply</span>' : ''}
+            </button>`).join('');
+
+            list.querySelectorAll('.msg-item').forEach(btn => btn.addEventListener('click', () => showMessage(btn.dataset.id)));
+        }
+
+        async function showMessage(id) {
+            const res = await axios.get(`/api/inbox/${id}`);
+            const m = res.data;
+            await axios.post(`/api/inbox/${id}/read`);
+            document.getElementById('messageDetail').innerHTML = `
+                <div class="mb-3"><strong>From:</strong> ${m.from}<br><strong>To:</strong> ${m.to}<br><strong>Date:</strong> ${new Date(m.receivedAt).toLocaleString()}</div>
+                <h5>${m.subject || '(no subject)'}</h5>
+                ${m.campaign ? `<p class="small"><span class="badge bg-info text-dark">Reply to campaign: ${m.campaign.name || ''}</span></p>` : ''}
+                <hr>
+                <pre class="small mb-0" style="white-space: pre-wrap; font-family: inherit;">${m.body || m.bodyPreview || ''}</pre>`;
+            loadMessages(document.getElementById('searchInput').value);
+            loadStats();
+        }
+
+        document.getElementById('syncBtn').addEventListener('click', async () => {
+            document.getElementById('syncBtn').disabled = true;
+            try {
+                await axios.post('/api/inbox/sync');
+                showToast('Sync complete', 'success');
+                await loadMessages();
+                await loadStats();
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Sync failed', 'error');
+            } finally {
+                document.getElementById('syncBtn').disabled = false;
+            }
+        });
+
+        let searchTimer;
+        document.getElementById('searchInput').addEventListener('input', e => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadMessages(e.target.value), 300);
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadStats();
+            await loadMessages();
+        });
+    </script>
+</body>
+</html>
