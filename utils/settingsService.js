@@ -22,6 +22,10 @@ function defaultSettings() {
         bulkConcurrency: Math.min(parseInt(process.env.BULK_CONCURRENCY || '3', 10), 5),
         reacherTimeoutMs: parseInt(process.env.REACHER_TIMEOUT_MS || '45000', 10),
         openaiApiKey: process.env.OPENAI_API_KEY || '',
+        groqApiKey: process.env.GROQ_API_KEY || '',
+        openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
+        aiProvider: (process.env.AI_PROVIDER || 'groq').toLowerCase(),
+        aiModel: process.env.AI_MODEL || '',
         autoRedirectAfterVerify: true,
     };
 }
@@ -41,6 +45,12 @@ function sanitizeSettings(input = {}) {
         bulkConcurrency: Number.isFinite(bulkConcurrency) ? Math.min(Math.max(bulkConcurrency, 1), 5) : 3,
         reacherTimeoutMs: Number.isFinite(reacherTimeoutMs) ? Math.min(Math.max(reacherTimeoutMs, 5000), 180000) : 45000,
         openaiApiKey: String(input.openaiApiKey ?? defaults.openaiApiKey ?? '').trim(),
+        groqApiKey: String(input.groqApiKey ?? defaults.groqApiKey ?? '').trim(),
+        openrouterApiKey: String(input.openrouterApiKey ?? defaults.openrouterApiKey ?? '').trim(),
+        aiProvider: ['groq', 'openai', 'openrouter'].includes(String(input.aiProvider || defaults.aiProvider).toLowerCase())
+            ? String(input.aiProvider || defaults.aiProvider).toLowerCase()
+            : 'groq',
+        aiModel: String(input.aiModel ?? defaults.aiModel ?? '').trim(),
         autoRedirectAfterVerify: input.autoRedirectAfterVerify !== false,
     };
 }
@@ -60,6 +70,12 @@ async function saveSettingsForUser(userId, input) {
     const merged = { ...defaultSettings(), ...(existing || {}), ...input };
     if (!input.openaiApiKey && existing?.openaiApiKey) {
         merged.openaiApiKey = existing.openaiApiKey;
+    }
+    if (!input.groqApiKey && existing?.groqApiKey) {
+        merged.groqApiKey = existing.groqApiKey;
+    }
+    if (!input.openrouterApiKey && existing?.openrouterApiKey) {
+        merged.openrouterApiKey = existing.openrouterApiKey;
     }
     const settings = sanitizeSettings(merged);
     const saved = await AppSettings.findOneAndUpdate(

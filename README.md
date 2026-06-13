@@ -45,13 +45,16 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 - **Create & start** — launch a campaign in one click from the wizard
 
 ### Templates
-- **4 starter templates** — Default Outreach, Soft Introduction, Follow-Up, Value-First
+- **Freight Dispatch (INDUS Transports)** — 10 subject + 10 body variants imported from the original Auto Emailer
+- **Starter templates** — Soft Introduction, Follow-Up, plus AI-generated variants
 - **Merge fields** — `{Name}`, `{Email}`, `{State}`, `{SENDER_NAME}`, `{SENDER_EMAIL}`, `{COMPANY_NAME}`
-- **AI template generator** — OpenAI-powered subject/body variants optimized to avoid spam triggers
+- **AI template generator** — Groq (free), OpenRouter, or OpenAI for spam-safe copy
 - **Edit & manage** — full CRUD from the Templates page or inline in campaign create
 
 ### Inbox & platform
-- **Unified inbox** — IMAP sync from sender accounts; campaign reply matching
+- **Unified inbox** — view all sender accounts together or filter by one Gmail account
+- **Per-account sync** — sync a single mailbox or all accounts at once
+- **Campaign reply matching** — IMAP sync with reply detection
 - **JWT auth**, dark mode, per-user settings
 
 ---
@@ -106,14 +109,14 @@ npm run start:all
 
 ### Optional: AI templates
 
-Add an OpenAI key in `.env` or **Settings → AI & workflow**:
+**Groq (free tier, recommended)** — get a key at [console.groq.com](https://console.groq.com):
 
 ```env
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
+AI_PROVIDER=groq
+GROQ_API_KEY=gsk_your_key_here
 ```
 
-Then use **AI Generate** on the Templates or Create Campaign pages.
+Also supports **OpenRouter** (free models) and **OpenAI**. Configure in **Settings → AI & workflow** or via `.env`.
 
 ---
 
@@ -177,8 +180,10 @@ Browser → Node.js + Express (:5000)
 | `VERIFIER_ENGINE` | `auto` | `auto`, `truemail`, or `reacher` |
 | `GO_VERIFIER_URL` | `http://localhost:8082` | truemail-go API |
 | `ENCRYPTION_KEY` | — | Encrypts sender credentials |
-| `OPENAI_API_KEY` | — | Optional — AI template generation |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model for templates |
+| `OPENAI_API_KEY` | — | Optional — OpenAI template generation |
+| `GROQ_API_KEY` | — | Optional — Groq free tier (recommended) |
+| `AI_PROVIDER` | `groq` | `groq`, `openrouter`, or `openai` |
+| `AI_MODEL` | — | Override default model per provider |
 
 See [`.env.example`](.env.example) for all options.
 

@@ -1,5 +1,12 @@
 const InboxMessage = require('../models/InboxMessage');
-const { syncAllAccounts } = require('../utils/imapSync');
+const SenderAccount = require('../models/SenderAccount');
+const { syncAllAccounts, syncSenderAccount } = require('../utils/imapSync');
+
+function accountFilter(userId, accountId) {
+    const filter = { user: userId };
+    if (accountId) filter.senderAccount = accountId;
+    return filter;
+}
 
 const listMessages = async (req, res) => {
     try {
@@ -59,8 +66,21 @@ const markRead = async (req, res) => {
 
 const syncInbox = async (req, res) => {
     try {
+        const { senderAccountId } = req.body || {};
+        if (senderAccountId) {
+            const account = await SenderAccount.findOne({
+                _id: senderAccountId,
+                user: req.user._id,
+                enabled: true,
+            });
+            if (!account) {
+                return res.status(404).json({ message: 'Sender account not found' });
+            }
+            const count = await syncSenderAccount(account);
+            return res.json({ message: `Synced ${count} new message(s) for ${account.email}`, count });
+        }
         await syncAllAccounts();
-        res.json({ message: 'Inbox sync completed' });
+        res.json({ message: 'Inbox sync completed for all accounts' });
     } catch (error) {
         res.status(500).json({ message: 'Inbox sync failed', error: error.message });
     }
@@ -68,10 +88,11 @@ const syncInbox = async (req, res) => {
 
 const inboxStats = async (req, res) => {
     try {
+        const filter = accountFilter(req.user._id, req.query.account);
         const [total, unread, withCampaign] = await Promise.all([
-            InboxMessage.countDocuments({ user: req.user._id }),
-            InboxMessage.countDocuments({ user: req.user._id, isRead: false }),
-            InboxMessage.countDocuments({ user: req.user._id, campaign: { $ne: null } }),
+            InboxMessage.countDocuments(filter),
+            InboxMessage.countDocuments({ ...filter, isRead: false }),
+            InboxMessage.countDocuments({ ...filter, campaign: { $ne: null } }),
         ]);
         res.json({ total, unread, campaignReplies: withCampaign });
     } catch (error) {
@@ -79,4 +100,15 @@ const inboxStats = async (req, res) => {
     }
 };
 
-module.exports = { listMessages, getMessage, markRead, syncInbox, inboxStats };
+const listSenderAccounts = async (req, res) => {
+    try {
+        const accounts = await SenderAccount.find({ user: req.user._id, enabled: true })
+            .sort({ displayName: 1, email: 1 })
+            .select('email displayName');
+        res.json(accounts);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching sender accounts', error: error.message });
+    }
+};
+
+module.exports = { listMessages, getMessage, markRead, syncInbox, inboxStats, listSenderAccounts };

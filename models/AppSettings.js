@@ -45,6 +45,26 @@ const AppSettingsSchema = new mongoose.Schema(
             default: '',
             trim: true,
         },
+        groqApiKey: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        openrouterApiKey: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        aiProvider: {
+            type: String,
+            enum: ['groq', 'openai', 'openrouter'],
+            default: 'groq',
+        },
+        aiModel: {
+            type: String,
+            default: '',
+            trim: true,
+        },
         autoRedirectAfterVerify: {
             type: Boolean,
             default: true,

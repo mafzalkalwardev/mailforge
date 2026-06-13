@@ -142,10 +142,30 @@
                 <div class="glass-card p-4">
                     <h5 class="mb-3 fw-bold"><i class="fa-solid fa-wand-magic-sparkles me-2 gradient-text"></i>AI &amp; workflow</h5>
                     <form id="workflowSettingsForm" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">AI provider</label>
+                            <select id="aiProvider" class="form-select">
+                                <option value="groq">Groq (free tier — recommended)</option>
+                                <option value="openrouter">OpenRouter (free models)</option>
+                                <option value="openai">OpenAI (paid)</option>
+                            </select>
+                            <div class="form-text">Groq: free key at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Model (optional override)</label>
+                            <input id="aiModel" type="text" class="form-control" placeholder="llama-3.3-70b-versatile">
+                        </div>
                         <div class="col-12">
-                            <label class="form-label">OpenAI API key</label>
+                            <label class="form-label">Groq API key</label>
+                            <input id="groqApiKey" type="password" class="form-control" placeholder="gsk_…" autocomplete="off">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">OpenRouter API key (optional)</label>
+                            <input id="openrouterApiKey" type="password" class="form-control" placeholder="sk-or-…" autocomplete="off">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">OpenAI API key (optional)</label>
                             <input id="openaiApiKey" type="password" class="form-control" placeholder="sk-…" autocomplete="off">
-                            <div class="form-text">Used for AI email template generation. Or set <code>OPENAI_API_KEY</code> in .env</div>
                         </div>
                         <div class="col-12">
                             <div class="form-check">
@@ -198,7 +218,21 @@
             document.getElementById('goApiUrl').textContent = settings.goVerifierUrl || settings.reacherUrl || 'Not configured';
             if (document.getElementById('openaiApiKey')) {
                 document.getElementById('openaiApiKey').value = settings.hasOpenAiKey ? '••••••••' : '';
-                document.getElementById('openaiApiKey').placeholder = settings.hasOpenAiKey ? 'Key saved (enter new to replace)' : 'sk-…';
+                document.getElementById('openaiApiKey').placeholder = settings.hasOpenAiKey ? 'Key saved' : 'sk-…';
+            }
+            if (document.getElementById('groqApiKey')) {
+                document.getElementById('groqApiKey').value = settings.hasGroqKey ? '••••••••' : '';
+                document.getElementById('groqApiKey').placeholder = settings.hasGroqKey ? 'Key saved' : 'gsk_…';
+            }
+            if (document.getElementById('openrouterApiKey')) {
+                document.getElementById('openrouterApiKey').value = settings.hasOpenRouterKey ? '••••••••' : '';
+                document.getElementById('openrouterApiKey').placeholder = settings.hasOpenRouterKey ? 'Key saved' : 'sk-or-…';
+            }
+            if (document.getElementById('aiProvider')) {
+                document.getElementById('aiProvider').value = settings.aiProvider || 'groq';
+            }
+            if (document.getElementById('aiModel')) {
+                document.getElementById('aiModel').value = settings.aiModel || '';
             }
             if (document.getElementById('autoRedirectAfterVerify')) {
                 document.getElementById('autoRedirectAfterVerify').checked = settings.autoRedirectAfterVerify !== false;
@@ -283,11 +317,17 @@
         document.getElementById('workflowSettingsForm')?.addEventListener('submit', async e => {
             e.preventDefault();
             try {
-                const keyInput = document.getElementById('openaiApiKey').value.trim();
                 const payload = {
                     autoRedirectAfterVerify: document.getElementById('autoRedirectAfterVerify').checked,
+                    aiProvider: document.getElementById('aiProvider').value,
+                    aiModel: document.getElementById('aiModel').value.trim(),
                 };
-                if (keyInput && keyInput !== '••••••••') payload.openaiApiKey = keyInput;
+                const groqKey = document.getElementById('groqApiKey').value.trim();
+                const orKey = document.getElementById('openrouterApiKey').value.trim();
+                const oaiKey = document.getElementById('openaiApiKey').value.trim();
+                if (groqKey && groqKey !== '••••••••') payload.groqApiKey = groqKey;
+                if (orKey && orKey !== '••••••••') payload.openrouterApiKey = orKey;
+                if (oaiKey && oaiKey !== '••••••••') payload.openaiApiKey = oaiKey;
                 const res = await axios.put('/api/settings', payload);
                 fillSettingsForm(res.data);
                 showToast('Workflow settings saved.', 'success');

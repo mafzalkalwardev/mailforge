@@ -14,6 +14,27 @@ Rules:
 - Include {SENDER_NAME} and {COMPANY_NAME} in signature
 - Return ONLY valid JSON, no markdown fences`;
 
+const AI_PROVIDERS = {
+    groq: {
+        label: 'Groq (free tier)',
+        baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+        defaultModel: 'llama-3.3-70b-versatile',
+        envKey: 'GROQ_API_KEY',
+    },
+    openai: {
+        label: 'OpenAI',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        defaultModel: 'gpt-4o-mini',
+        envKey: 'OPENAI_API_KEY',
+    },
+    openrouter: {
+        label: 'OpenRouter (free models)',
+        baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
+        defaultModel: 'google/gemma-2-9b-it:free',
+        envKey: 'OPENROUTER_API_KEY',
+    },
+};
+
 function buildUserPrompt({ companyName, industry, goal, tone, count }) {
     return `Generate ${count || 3} email subject lines and ${count || 3} body variants for cold outreach.
 
@@ -44,16 +65,50 @@ function parseAiJson(text) {
     };
 }
 
-async function generateEmailTemplates(apiKey, options = {}) {
+function resolveAiConfig(settings = {}) {
+    const provider = String(settings.aiProvider || process.env.AI_PROVIDER || 'groq').toLowerCase();
+    const def = AI_PROVIDERS[provider] || AI_PROVIDERS.groq;
+
+    const keyByProvider = {
+        groq: settings.groqApiKey || process.env.GROQ_API_KEY,
+        openai: settings.openaiApiKey || process.env.OPENAI_API_KEY,
+        openrouter: settings.openrouterApiKey || process.env.OPENROUTER_API_KEY,
+    };
+
+    const apiKey = keyByProvider[provider] || settings.openaiApiKey || process.env.OPENAI_API_KEY;
+    const model =
+        settings.aiModel ||
+        process.env.AI_MODEL ||
+        (provider === 'openai' ? process.env.OPENAI_MODEL : null) ||
+        def.defaultModel;
+
+    const baseUrl = settings.aiBaseUrl || def.baseUrl;
+
+    return { provider, apiKey, model, baseUrl, label: def.label };
+}
+
+async function generateEmailTemplates(settings = {}, options = {}) {
+    const { apiKey, model, baseUrl, provider, label } = resolveAiConfig(settings);
+
     if (!apiKey) {
         throw new Error(
-            'OpenAI API key not configured. Add OPENAI_API_KEY to .env or Settings → AI Templates.'
+            `No API key for ${label}. Add a key in Settings → AI & workflow, or set ` +
+            `${AI_PROVIDERS[provider]?.envKey || 'GROQ_API_KEY'} in .env. ` +
+            'Groq offers a free tier at console.groq.com.'
         );
     }
 
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const headers = {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+    };
+    if (provider === 'openrouter') {
+        headers['HTTP-Referer'] = process.env.APP_URL || 'http://localhost:5000';
+        headers['X-Title'] = 'MailForge';
+    }
+
     const { data } = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
+        baseUrl,
         {
             model,
             temperature: 0.8,
@@ -63,13 +118,7 @@ async function generateEmailTemplates(apiKey, options = {}) {
                 { role: 'user', content: buildUserPrompt(options) },
             ],
         },
-        {
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 60000,
-        }
+        { headers, timeout: 90000 }
     );
 
     const content = data?.choices?.[0]?.message?.content;
@@ -80,4 +129,9 @@ async function generateEmailTemplates(apiKey, options = {}) {
     return result;
 }
 
-module.exports = { generateEmailTemplates, MERGE_FIELDS };
+module.exports = {
+    generateEmailTemplates,
+    resolveAiConfig,
+    AI_PROVIDERS,
+    MERGE_FIELDS,
+};

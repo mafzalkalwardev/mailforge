@@ -1,6 +1,7 @@
 const EmailTemplate = require('../models/EmailTemplate');
 const { getSettingsForUser } = require('../utils/settingsService');
 const { generateEmailTemplates } = require('../utils/aiTemplateService');
+const { FREIGHT_DISPATCH_NAME, FREIGHT_DISPATCH_TEMPLATE } = require('../utils/freightDispatchTemplates');
 
 const DEFAULT_SUBJECTS = [
     'Quick introduction — {COMPANY_NAME}',
@@ -22,13 +23,7 @@ Best regards,
 ];
 
 const STARTER_TEMPLATES = [
-    {
-        name: 'Default Outreach',
-        isDefault: true,
-        companyName: 'Your Company',
-        subjectTemplates: DEFAULT_SUBJECTS,
-        bodyTemplates: DEFAULT_BODIES,
-    },
+    { ...FREIGHT_DISPATCH_TEMPLATE, isDefault: true },
     {
         name: 'Soft Introduction',
         companyName: 'Your Company',
@@ -71,33 +66,30 @@ Thanks,
 {SENDER_EMAIL}`,
         ],
     },
-    {
-        name: 'Value-First',
-        companyName: 'Your Company',
-        subjectTemplates: [
-            'Idea for {Name}',
-            '{COMPANY_NAME} + your team',
-            'Worth a quick look, {Name}?',
-        ],
-        bodyTemplates: [
-            `Hello {Name},
-
-{SENDER_NAME} here from {COMPANY_NAME}. We work with businesses in {State} and nearby regions on logistics and dispatch efficiency.
-
-I have a few ideas that might fit your workflow. Open to a 10-minute call this week?
-
-Regards,
-{SENDER_NAME}
-{COMPANY_NAME}`,
-        ],
-    },
 ];
 
+async function ensureFreightDispatchTemplate(userId) {
+    const existing = await EmailTemplate.findOne({ user: userId, name: FREIGHT_DISPATCH_NAME });
+    if (existing) return existing;
+
+    const hasDefault = await EmailTemplate.exists({ user: userId, isDefault: true });
+    return EmailTemplate.create({
+        user: userId,
+        ...FREIGHT_DISPATCH_TEMPLATE,
+        isDefault: !hasDefault,
+    });
+}
+
 async function ensureDefaultTemplate(userId) {
+    await ensureFreightDispatchTemplate(userId);
+
     const count = await EmailTemplate.countDocuments({ user: userId });
-    if (count > 0) return null;
+    if (count > 1) return null;
+
     const created = [];
     for (const tpl of STARTER_TEMPLATES) {
+        const exists = await EmailTemplate.findOne({ user: userId, name: tpl.name });
+        if (exists) continue;
         created.push(await EmailTemplate.create({ user: userId, ...tpl }));
     }
     return created;
@@ -174,8 +166,7 @@ const generateTemplate = async (req, res) => {
 
     try {
         const settings = await getSettingsForUser(req.user._id);
-        const apiKey = settings.openaiApiKey || process.env.OPENAI_API_KEY;
-        const generated = await generateEmailTemplates(apiKey, {
+        const generated = await generateEmailTemplates(settings, {
             companyName,
             industry,
             goal,
