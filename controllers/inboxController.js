@@ -8,14 +8,21 @@ function accountFilter(userId, accountId) {
     return filter;
 }
 
+function applyInboxFilter(filter, filterType) {
+    const f = String(filterType || 'all').toLowerCase();
+    if (f === 'unread') filter.isRead = false;
+    else if (f === 'starred') filter.isStarred = true;
+    else if (f === 'important') filter.isImportant = true;
+    return filter;
+}
+
 const listMessages = async (req, res) => {
     try {
-        const { account, campaign, q, limit = 50, offset = 0 } = req.query;
-        const filter = { user: req.user._id };
-        if (account) filter.senderAccount = account;
-        if (campaign) filter.campaign = campaign;
+        const { account, campaign, q, filter, limit = 50, offset = 0 } = req.query;
+        const filterQuery = applyInboxFilter(accountFilter(req.user._id, account), filter);
+        if (campaign) filterQuery.campaign = campaign;
         if (q) {
-            filter.$or = [
+            filterQuery.$or = [
                 { subject: { $regex: q, $options: 'i' } },
                 { from: { $regex: q, $options: 'i' } },
                 { bodyPreview: { $regex: q, $options: 'i' } },
@@ -23,13 +30,13 @@ const listMessages = async (req, res) => {
         }
 
         const [messages, total] = await Promise.all([
-            InboxMessage.find(filter)
+            InboxMessage.find(filterQuery)
                 .sort({ receivedAt: -1 })
                 .skip(Number(offset))
                 .limit(Math.min(Number(limit), 100))
                 .populate('senderAccount', 'email displayName')
                 .populate('campaign', 'name'),
-            InboxMessage.countDocuments(filter),
+            InboxMessage.countDocuments(filterQuery),
         ]);
 
         res.json({ messages, total });
@@ -64,6 +71,30 @@ const markRead = async (req, res) => {
     }
 };
 
+const toggleStar = async (req, res) => {
+    try {
+        const message = await InboxMessage.findOne({ _id: req.params.id, user: req.user._id });
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+        message.isStarred = !message.isStarred;
+        await message.save();
+        res.json(message);
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating star', error: error.message });
+    }
+};
+
+const toggleImportant = async (req, res) => {
+    try {
+        const message = await InboxMessage.findOne({ _id: req.params.id, user: req.user._id });
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+        message.isImportant = !message.isImportant;
+        await message.save();
+        res.json(message);
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating important', error: error.message });
+    }
+};
+
 const syncInbox = async (req, res) => {
     try {
         const { senderAccountId } = req.body || {};
@@ -88,13 +119,15 @@ const syncInbox = async (req, res) => {
 
 const inboxStats = async (req, res) => {
     try {
-        const filter = accountFilter(req.user._id, req.query.account);
-        const [total, unread, withCampaign] = await Promise.all([
-            InboxMessage.countDocuments(filter),
-            InboxMessage.countDocuments({ ...filter, isRead: false }),
-            InboxMessage.countDocuments({ ...filter, campaign: { $ne: null } }),
+        const base = accountFilter(req.user._id, req.query.account);
+        const [total, unread, starred, important, withCampaign] = await Promise.all([
+            InboxMessage.countDocuments(base),
+            InboxMessage.countDocuments({ ...base, isRead: false }),
+            InboxMessage.countDocuments({ ...base, isStarred: true }),
+            InboxMessage.countDocuments({ ...base, isImportant: true }),
+            InboxMessage.countDocuments({ ...base, campaign: { $ne: null } }),
         ]);
-        res.json({ total, unread, campaignReplies: withCampaign });
+        res.json({ total, unread, starred, important, campaignReplies: withCampaign });
     } catch (error) {
         res.status(500).json({ message: 'Error fetching inbox stats', error: error.message });
     }
@@ -111,4 +144,13 @@ const listSenderAccounts = async (req, res) => {
     }
 };
 
-module.exports = { listMessages, getMessage, markRead, syncInbox, inboxStats, listSenderAccounts };
+module.exports = {
+    listMessages,
+    getMessage,
+    markRead,
+    toggleStar,
+    toggleImportant,
+    syncInbox,
+    inboxStats,
+    listSenderAccounts,
+};

@@ -508,3 +508,204 @@ body.dark-mode .page-header .page-subtitle {
     font-weight: 700;
     margin-bottom: 0.75rem;
 }
+
+/* ── Modals & popups (dark mode) ─────────────────────── */
+body.dark-mode .modal-content {
+    background: #16162a;
+    color: var(--text-dark);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+}
+
+body.dark-mode .modal-header,
+body.dark-mode .modal-footer {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .modal-title {
+    color: var(--text-dark);
+}
+
+body.dark-mode .modal-body {
+    color: rgba(232, 234, 246, 0.92);
+}
+
+body.dark-mode .btn-close {
+    filter: invert(1) grayscale(1);
+    opacity: 0.75;
+}
+
+body.dark-mode .form-label {
+    color: rgba(232, 234, 246, 0.9);
+}
+
+body.dark-mode .form-select {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--text-dark);
+}
+
+body.dark-mode .form-select:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+body.dark-mode .form-text,
+body.dark-mode .form-text a {
+    color: rgba(232, 234, 246, 0.55) !important;
+}
+
+body.dark-mode .form-text a:hover {
+    color: var(--primary) !important;
+}
+
+body.dark-mode textarea.form-control {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--text-dark);
+}
+
+body.dark-mode .list-group-item {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: var(--text-dark);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+body.dark-mode .list-group-item-action:hover,
+body.dark-mode .list-group-item-action:focus {
+    background-color: rgba(99, 102, 241, 0.12);
+    color: #fff;
+}
+
+body.dark-mode .dropdown-menu {
+    background: #16162a;
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+body.dark-mode .dropdown-item {
+    color: var(--text-dark);
+}
+
+body.dark-mode .dropdown-item:hover,
+body.dark-mode .dropdown-item:focus {
+    background: rgba(99, 102, 241, 0.15);
+    color: #fff;
+}
+
+body.dark-mode .alert {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .alert-success {
+    background: rgba(40, 167, 69, 0.15);
+    color: #7dcea0;
+}
+
+body.dark-mode .alert-primary {
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
+}
+
+body.dark-mode .alert-warning {
+    background: rgba(255, 193, 7, 0.12);
+    color: #fcd34d;
+}
+
+body.dark-mode pre {
+    color: rgba(232, 234, 246, 0.9);
+}
+
+body.dark-mode .bg-light,
+body.dark-mode .dark-bg {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    color: var(--text-dark) !important;
+}
+
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode h6,
+body.dark-mode .fw-bold,
+body.dark-mode .fw-semibold,
+body.dark-mode strong {
+    color: var(--text-dark);
+}
+
+body.dark-mode .text-body {
+    color: var(--text-dark) !important;
+}
+
+body.dark-mode .btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-dark);
+}
+
+body.dark-mode .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+body.dark-mode .table {
+    --bs-table-bg: transparent;
+}
+
+body.dark-mode code {
+    color: #c4b5fd;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+}
+
+/* ── Inbox filter pills ──────────────────────────────── */
+.inbox-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.inbox-filter-btn {
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 6px 14px;
+}
+
+.inbox-filter-btn.active {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-color: transparent;
+    color: #fff !important;
+}
+
+body.dark-mode .inbox-filter-btn:not(.active) {
+    color: rgba(232, 234, 246, 0.85);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.msg-star-btn,
+.msg-important-btn {
+    border: none;
+    background: transparent;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    opacity: 0.45;
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.msg-star-btn.active,
+.msg-important-btn.active {
+    opacity: 1;
+}
+
+.msg-star-btn.active {
+    color: #fbbf24;
+}
+
+.msg-important-btn.active {
+    color: #f87171;
+}

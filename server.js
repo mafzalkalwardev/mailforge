@@ -9,6 +9,7 @@ const { ensureGoVerifier, stopGoVerifier } = require('./utils/spawnGo');
 const { resetEngineCache } = require('./utils/verificationEngine');
 const { startInboxSync, stopInboxSync } = require('./utils/imapSync');
 const { resumeInterruptedJobs } = require('./utils/bulkVerifyWorker');
+const { seedTemplatesForAllUsers } = require('./utils/seedTemplates');
 
 dotenv.config();
 
@@ -29,6 +30,8 @@ async function start() {
         startInboxSync();
         console.log('Resuming any interrupted verify jobs...');
         await resumeInterruptedJobs();
+        console.log('Seeding email templates for all users...');
+        await seedTemplatesForAllUsers();
     } else {
         console.log('Cloud runtime detected. Use Settings or env vars for hosted verifier URLs.');
     }

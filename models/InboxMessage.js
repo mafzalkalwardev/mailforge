@@ -14,6 +14,8 @@ const InboxMessageSchema = new mongoose.Schema(
         bodyPreview: { type: String, default: '' },
         body: { type: String, default: '' },
         isRead: { type: Boolean, default: false },
+        isStarred: { type: Boolean, default: false },
+        isImportant: { type: Boolean, default: false },
         receivedAt: { type: Date, required: true },
         syncedAt: { type: Date, default: Date.now },
     },
@@ -23,5 +25,8 @@ const InboxMessageSchema = new mongoose.Schema(
 InboxMessageSchema.index({ user: 1, senderAccount: 1, uid: 1 }, { unique: true });
 InboxMessageSchema.index({ user: 1, receivedAt: -1 });
 InboxMessageSchema.index({ user: 1, campaign: 1 });
+InboxMessageSchema.index({ user: 1, isRead: 1 });
+InboxMessageSchema.index({ user: 1, isStarred: 1 });
+InboxMessageSchema.index({ user: 1, isImportant: 1 });
 
 module.exports = mongoose.model('InboxMessage', InboxMessageSchema);

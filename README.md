@@ -29,6 +29,33 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ---
 
+## Screenshots
+
+### Unified Inbox
+Filter by sender account, unread, starred, and important.
+
+![Unified Inbox](docs/screenshots/inbox.png)
+
+### Email Templates
+Ten freight outreach templates from the original Auto Emailer, plus AI generation.
+
+![Email Templates](docs/screenshots/templates.png)
+
+### Dark mode
+Modals, forms, and popups are fully readable in dark mode.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/senders-dark.png" alt="Senders dark mode" /></td>
+<td width="50%"><img src="docs/screenshots/templates-modal-dark.png" alt="Template modal dark mode" /></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/bulk-import-dark.png" alt="Bulk import modal dark mode" /></td>
+</tr>
+</table>
+
+---
+
 ## Features
 
 ### Verification
@@ -45,16 +72,16 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 - **Create & start** — launch a campaign in one click from the wizard
 
 ### Templates
-- **Freight Dispatch (INDUS Transports)** — 10 subject + 10 body variants imported from the original Auto Emailer
-- **Starter templates** — Soft Introduction, Follow-Up, plus AI-generated variants
+- **10 Freight Outreach templates** — imported from the original Auto Emailer (INDUS Transports)
+- **Combined freight pack** — all 10 subjects + 10 bodies in one template for random rotation
 - **Merge fields** — `{Name}`, `{Email}`, `{State}`, `{SENDER_NAME}`, `{SENDER_EMAIL}`, `{COMPANY_NAME}`
 - **AI template generator** — Groq (free), OpenRouter, or OpenAI for spam-safe copy
 - **Edit & manage** — full CRUD from the Templates page or inline in campaign create
 
 ### Inbox & platform
 - **Unified inbox** — view all sender accounts together or filter by one Gmail account
+- **Unread / Starred / Important** — filter pills and toggle on each message
 - **Per-account sync** — sync a single mailbox or all accounts at once
-- **Campaign reply matching** — IMAP sync with reply detection
 - **JWT auth**, dark mode, per-user settings
 
 ---

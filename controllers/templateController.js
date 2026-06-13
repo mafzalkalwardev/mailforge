@@ -1,103 +1,11 @@
 const EmailTemplate = require('../models/EmailTemplate');
 const { getSettingsForUser } = require('../utils/settingsService');
 const { generateEmailTemplates } = require('../utils/aiTemplateService');
-const { FREIGHT_DISPATCH_NAME, FREIGHT_DISPATCH_TEMPLATE } = require('../utils/freightDispatchTemplates');
-
-const DEFAULT_SUBJECTS = [
-    'Quick introduction — {COMPANY_NAME}',
-    'Following up — opportunity for {Name}',
-    'Let\'s connect — {COMPANY_NAME}',
-];
-
-const DEFAULT_BODIES = [
-    `Hi {Name},
-
-I hope this message finds you well. My name is {SENDER_NAME} from {COMPANY_NAME}, and I'd like to connect with you.
-
-Please let me know if you're interested in learning more.
-
-Best regards,
-{SENDER_NAME}
-{COMPANY_NAME}
-{SENDER_EMAIL}`,
-];
-
-const STARTER_TEMPLATES = [
-    { ...FREIGHT_DISPATCH_TEMPLATE, isDefault: true },
-    {
-        name: 'Soft Introduction',
-        companyName: 'Your Company',
-        subjectTemplates: [
-            'Quick note for {Name}',
-            '{COMPANY_NAME} — thought of you',
-            'Reaching out, {Name}',
-        ],
-        bodyTemplates: [
-            `Hi {Name},
-
-I'm {SENDER_NAME} with {COMPANY_NAME}. I came across your contact and wanted to reach out briefly.
-
-We help teams like yours streamline operations. If that's on your radar, I'd love to share a quick overview — no pressure at all.
-
-Would a short reply work for you?
-
-Best,
-{SENDER_NAME}
-{COMPANY_NAME}`,
-        ],
-    },
-    {
-        name: 'Follow-Up',
-        companyName: 'Your Company',
-        subjectTemplates: [
-            'Following up — {Name}',
-            'Re: {COMPANY_NAME}',
-            'Circling back, {Name}',
-        ],
-        bodyTemplates: [
-            `Hi {Name},
-
-I wanted to follow up on my earlier note from {COMPANY_NAME}.
-
-If now isn't the right time, no worries — just let me know. Otherwise, I'm happy to answer any questions.
-
-Thanks,
-{SENDER_NAME}
-{SENDER_EMAIL}`,
-        ],
-    },
-];
-
-async function ensureFreightDispatchTemplate(userId) {
-    const existing = await EmailTemplate.findOne({ user: userId, name: FREIGHT_DISPATCH_NAME });
-    if (existing) return existing;
-
-    const hasDefault = await EmailTemplate.exists({ user: userId, isDefault: true });
-    return EmailTemplate.create({
-        user: userId,
-        ...FREIGHT_DISPATCH_TEMPLATE,
-        isDefault: !hasDefault,
-    });
-}
-
-async function ensureDefaultTemplate(userId) {
-    await ensureFreightDispatchTemplate(userId);
-
-    const count = await EmailTemplate.countDocuments({ user: userId });
-    if (count > 1) return null;
-
-    const created = [];
-    for (const tpl of STARTER_TEMPLATES) {
-        const exists = await EmailTemplate.findOne({ user: userId, name: tpl.name });
-        if (exists) continue;
-        created.push(await EmailTemplate.create({ user: userId, ...tpl }));
-    }
-    return created;
-}
+const { seedTemplatesForUser } = require('../utils/seedTemplates');
 
 const listTemplates = async (req, res) => {
     try {
-        await ensureDefaultTemplate(req.user._id);
+        await seedTemplatesForUser(req.user._id);
         const templates = await EmailTemplate.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.json(templates);
     } catch (error) {

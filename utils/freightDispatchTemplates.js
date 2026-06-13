@@ -179,9 +179,19 @@ const FREIGHT_DISPATCH_TEMPLATE = {
     bodyTemplates: FREIGHT_BODY_TEMPLATES,
 };
 
+/** Ten individual templates — one subject + one body each (from Auto Emailer). */
+const FREIGHT_VARIANT_TEMPLATES = FREIGHT_SUBJECT_TEMPLATES.map((subject, i) => ({
+    name: `Freight Outreach ${i + 1}`,
+    companyName: 'INDUS TRANSPORTS LLC',
+    isDefault: i === 0,
+    subjectTemplates: [subject],
+    bodyTemplates: [FREIGHT_BODY_TEMPLATES[i]],
+}));
+
 module.exports = {
     FREIGHT_DISPATCH_NAME,
     FREIGHT_DISPATCH_TEMPLATE,
+    FREIGHT_VARIANT_TEMPLATES,
     FREIGHT_SUBJECT_TEMPLATES,
     FREIGHT_BODY_TEMPLATES,
 };
