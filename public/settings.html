@@ -138,6 +138,28 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="glass-card p-4">
+                    <h5 class="mb-3 fw-bold"><i class="fa-solid fa-wand-magic-sparkles me-2 gradient-text"></i>AI &amp; workflow</h5>
+                    <form id="workflowSettingsForm" class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">OpenAI API key</label>
+                            <input id="openaiApiKey" type="password" class="form-control" placeholder="sk-…" autocomplete="off">
+                            <div class="form-text">Used for AI email template generation. Or set <code>OPENAI_API_KEY</code> in .env</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="autoRedirectAfterVerify" checked>
+                                <label class="form-check-label" for="autoRedirectAfterVerify">After bulk verify, auto-open campaign sender with verified list</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> Save Workflow Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -174,6 +196,13 @@
             document.getElementById('bulkConcurrency').value = settings.bulkConcurrency || 3;
             document.getElementById('reacherTimeoutMs').value = settings.reacherTimeoutMs || 45000;
             document.getElementById('goApiUrl').textContent = settings.goVerifierUrl || settings.reacherUrl || 'Not configured';
+            if (document.getElementById('openaiApiKey')) {
+                document.getElementById('openaiApiKey').value = settings.hasOpenAiKey ? '••••••••' : '';
+                document.getElementById('openaiApiKey').placeholder = settings.hasOpenAiKey ? 'Key saved (enter new to replace)' : 'sk-…';
+            }
+            if (document.getElementById('autoRedirectAfterVerify')) {
+                document.getElementById('autoRedirectAfterVerify').checked = settings.autoRedirectAfterVerify !== false;
+            }
         }
 
         function readSettingsForm() {
@@ -250,6 +279,22 @@
 
         document.getElementById('engineSettingsForm').addEventListener('submit', saveSettings);
         document.getElementById('refreshHealthBtn').addEventListener('click', checkEngineHealth);
+
+        document.getElementById('workflowSettingsForm')?.addEventListener('submit', async e => {
+            e.preventDefault();
+            try {
+                const keyInput = document.getElementById('openaiApiKey').value.trim();
+                const payload = {
+                    autoRedirectAfterVerify: document.getElementById('autoRedirectAfterVerify').checked,
+                };
+                if (keyInput && keyInput !== '••••••••') payload.openaiApiKey = keyInput;
+                const res = await axios.put('/api/settings', payload);
+                fillSettingsForm(res.data);
+                showToast('Workflow settings saved.', 'success');
+            } catch (err) {
+                showToast(err.response?.data?.message || 'Could not save workflow settings.', 'error');
+            }
+        });
     </script>
 </body>
 </html>

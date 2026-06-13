@@ -40,6 +40,15 @@ const AppSettingsSchema = new mongoose.Schema(
             max: 180000,
             default: 45000,
         },
+        openaiApiKey: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        autoRedirectAfterVerify: {
+            type: Boolean,
+            default: true,
+        },
     },
     { timestamps: true }
 );

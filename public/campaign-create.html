@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Campaign - MailOps</title>
+    <title>Create Campaign - MailForge</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -17,7 +17,7 @@
         <div class="sidebar-brand mb-4">
             <a href="/dashboard.html" class="brand-link">
                 <img src="/favicon.svg" alt="" class="brand-icon" width="36" height="36">
-                <div class="brand-text"><span class="brand-title">MailOps</span></div>
+                <div class="brand-text"><span class="brand-title">MailForge</span></div>
             </a>
         </div>
         <nav class="nav flex-column px-2"></nav>
@@ -25,12 +25,18 @@
 
     <div class="main-content">
         <div class="container-fluid py-4">
-            <h2 class="fw-bold mb-4">Create Campaign</h2>
+            <h2 class="fw-bold mb-2">Create Campaign</h2>
+            <p class="text-muted mb-4">Send to your verified list using sender accounts and email templates</p>
+
+            <div id="fromVerifyBanner" class="alert alert-success d-none mb-4">
+                <i class="fa-solid fa-circle-check me-2"></i>
+                <strong>Verified list loaded.</strong> Pick a template and sender accounts, then start sending.
+            </div>
 
             <div class="row g-4">
                 <div class="col-lg-8">
                     <div class="glass-card p-4 mb-4">
-                        <h5 class="mb-3">1. Select verified list</h5>
+                        <h5 class="mb-3">1. Verified list</h5>
                         <select id="bulkJobSelect" class="form-select mb-2">
                             <option value="">Loading bulk jobs...</option>
                         </select>
@@ -38,6 +44,7 @@
                             <input class="form-check-input" type="checkbox" id="validOnly" checked>
                             <label class="form-check-label" for="validOnly">Valid emails only</label>
                         </div>
+                        <p id="listStats" class="small text-muted mt-2 mb-0"></p>
                     </div>
 
                     <div class="glass-card p-4 mb-4">
@@ -47,8 +54,17 @@
                             <input type="text" id="campaignName" class="form-control" placeholder="March outreach">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Template</label>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0">Email template</label>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="aiGenerateBtn">
+                                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Generate
+                                    </button>
+                                    <a href="/templates.html" class="btn btn-sm btn-outline-secondary">Manage all</a>
+                                </div>
+                            </div>
                             <select id="templateSelect" class="form-select"></select>
+                            <p id="templateMeta" class="small text-muted mt-1 mb-0"></p>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Company name (for {COMPANY_NAME})</label>
@@ -94,9 +110,13 @@
                     <div class="glass-card p-4 sticky-top" style="top: 1rem;">
                         <h5 class="mb-3">Preview</h5>
                         <p class="small text-muted">Merge fields: {Name}, {Email}, {State}, {SENDER_NAME}, {SENDER_EMAIL}, {COMPANY_NAME}</p>
+                        <div class="mb-2">
+                            <label class="small text-muted">Subject variant</label>
+                            <select id="previewSubjectIdx" class="form-select form-select-sm"></select>
+                        </div>
                         <div id="templatePreview" class="small bg-light dark-bg p-3 rounded" style="white-space: pre-wrap; max-height: 300px; overflow: auto;">Select a template</div>
                         <button id="createBtn" class="btn btn-primary w-100 mt-3">Create Campaign</button>
-                        <button id="createAndStartBtn" class="btn btn-success w-100 mt-2">Create &amp; Start</button>
+                        <button id="createAndStartBtn" class="btn btn-success w-100 mt-2"><i class="fa-solid fa-paper-plane me-1"></i>Create &amp; Start Sending</button>
                     </div>
                 </div>
             </div>
@@ -123,6 +143,50 @@
         </div>
     </div>
 
+    <div class="modal fade" id="aiTemplateModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-wand-magic-sparkles me-2 text-primary"></i>AI Template Generator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">Generates spam-safe cold email variants. Requires OpenAI API key in <a href="/settings.html">Settings</a>.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Company name</label>
+                        <input type="text" id="aiCompany" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Industry / niche</label>
+                        <input type="text" id="aiIndustry" class="form-control" placeholder="logistics, trucking, SaaS…">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Goal</label>
+                        <input type="text" id="aiGoal" class="form-control" placeholder="book a discovery call">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tone</label>
+                        <select id="aiTone" class="form-select">
+                            <option value="professional and friendly">Professional &amp; friendly</option>
+                            <option value="direct and concise">Direct &amp; concise</option>
+                            <option value="warm and conversational">Warm &amp; conversational</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="aiSaveDefault">
+                        <label class="form-check-label" for="aiSaveDefault">Set as default template</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="aiGenerateConfirmBtn">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/sidebar.js"></script>
@@ -130,18 +194,59 @@
     <script>
         let templates = [];
         let senders = [];
+        let bulkJobs = [];
 
         const params = new URLSearchParams(window.location.search);
         const preselectedJob = params.get('bulkJobId');
+        const fromVerify = params.get('fromVerify') === '1';
+        if (params.get('validOnly') === '1') {
+            document.getElementById('validOnly').checked = true;
+        }
+        if (fromVerify) {
+            document.getElementById('fromVerifyBanner').classList.remove('d-none');
+        }
+
+        function updateListStats() {
+            const job = bulkJobs.find(j => j._id === document.getElementById('bulkJobSelect').value);
+            const el = document.getElementById('listStats');
+            if (!job) { el.textContent = ''; return; }
+            const s = job.stats || {};
+            el.textContent = `${s.valid ?? 0} valid · ${s.invalid ?? 0} invalid · ${s.total ?? 0} total`;
+            if (!document.getElementById('campaignName').value && job.fileName) {
+                document.getElementById('campaignName').value = job.fileName.replace(/\.(csv|xlsx)$/i, '') + ' campaign';
+            }
+        }
 
         function updatePreview() {
             const tpl = templates.find(t => t._id === document.getElementById('templateSelect').value);
             const el = document.getElementById('templatePreview');
-            if (!tpl) { el.textContent = 'Select a template'; return; }
-            const subj = (tpl.subjectTemplates || [])[0] || '';
-            const body = (tpl.bodyTemplates || [])[0] || '';
+            const subjSelect = document.getElementById('previewSubjectIdx');
+            if (!tpl) {
+                el.textContent = 'Select a template';
+                subjSelect.innerHTML = '';
+                document.getElementById('templateMeta').textContent = '';
+                return;
+            }
+            const subjects = tpl.subjectTemplates || [];
+            const bodies = tpl.bodyTemplates || [];
+            subjSelect.innerHTML = subjects.map((s, i) =>
+                `<option value="${i}">${s.slice(0, 60)}${s.length > 60 ? '…' : ''}</option>`
+            ).join('');
+            const subjIdx = parseInt(subjSelect.value || '0', 10);
+            const subj = subjects[subjIdx] || subjects[0] || '';
+            const body = bodies[0] || '';
             el.textContent = `Subject: ${subj}\n\n${body}`;
-            document.getElementById('companyName').value = document.getElementById('companyName').value || tpl.companyName || '';
+            document.getElementById('templateMeta').textContent =
+                `${subjects.length} subject line(s) · ${bodies.length} body variant(s)`;
+            document.getElementById('companyName').value =
+                document.getElementById('companyName').value || tpl.companyName || '';
+        }
+
+        function renderTemplates() {
+            document.getElementById('templateSelect').innerHTML = templates.map(t =>
+                `<option value="${t._id}">${t.name}${t.isDefault ? ' (default)' : ''}</option>`
+            ).join('');
+            updatePreview();
         }
 
         async function loadData() {
@@ -151,31 +256,32 @@
                 axios.get('/api/senders'),
             ]);
 
+            bulkJobs = jobsRes.data;
             const jobSelect = document.getElementById('bulkJobSelect');
-            jobSelect.innerHTML = jobsRes.data.map(j =>
+            jobSelect.innerHTML = bulkJobs.map(j =>
                 `<option value="${j._id}" ${j._id === preselectedJob ? 'selected' : ''}>${j.fileName} (${j.stats?.valid ?? 0} valid)</option>`
             ).join('') || '<option value="">No bulk jobs — run bulk verify first</option>';
+            jobSelect.addEventListener('change', updateListStats);
+            updateListStats();
 
             templates = tplRes.data;
-            document.getElementById('templateSelect').innerHTML = templates.map(t =>
-                `<option value="${t._id}">${t.name}${t.isDefault ? ' (default)' : ''}</option>`
-            ).join('');
+            renderTemplates();
             document.getElementById('templateSelect').addEventListener('change', updatePreview);
-            updatePreview();
+            document.getElementById('previewSubjectIdx').addEventListener('change', updatePreview);
 
             senders = sendersRes.data;
             document.getElementById('senderCheckboxes').innerHTML = senders.length
                 ? senders.map(s => `<div class="form-check"><input class="form-check-input sender-cb" type="checkbox" value="${s._id}" id="sender-${s._id}" checked><label class="form-check-label" for="sender-${s._id}">${s.displayName || s.email} &lt;${s.email}&gt;</label></div>`).join('')
-                : '<p class="text-warning">No senders configured. <a href="/senders.html">Add sender accounts</a> first.</p>';
+                : '<p class="text-warning mb-0">No senders yet. <a href="/senders.html">Add sender accounts</a> or bulk import below.</p>';
         }
 
         async function createCampaign(startAfter) {
             const bulkJobId = document.getElementById('bulkJobSelect').value;
             const name = document.getElementById('campaignName').value.trim();
-            if (!bulkJobId || !name) return showToast('Select a bulk job and enter a campaign name', 'error');
+            if (!bulkJobId || !name) return showToast('Select a verified list and enter a campaign name', 'error');
 
             const senderAccountIds = [...document.querySelectorAll('.sender-cb:checked')].map(cb => cb.value);
-            if (!senderAccountIds.length) return showToast('Select at least one sender', 'error');
+            if (!senderAccountIds.length) return showToast('Select at least one sender account', 'error');
 
             const payload = {
                 bulkJobId,
@@ -196,7 +302,7 @@
                 const res = await axios.post('/api/campaigns/from-bulk-job', payload);
                 if (startAfter) {
                     await axios.post(`/api/campaigns/${res.data._id}/start`);
-                    showToast('Campaign created and started', 'success');
+                    showToast('Campaign created and sending started', 'success');
                 } else {
                     showToast('Campaign created', 'success');
                 }
@@ -208,6 +314,38 @@
 
         document.getElementById('createBtn').addEventListener('click', () => createCampaign(false));
         document.getElementById('createAndStartBtn').addEventListener('click', () => createCampaign(true));
+
+        document.getElementById('aiGenerateBtn').addEventListener('click', () => {
+            document.getElementById('aiCompany').value = document.getElementById('companyName').value;
+            new bootstrap.Modal(document.getElementById('aiTemplateModal')).show();
+        });
+
+        document.getElementById('aiGenerateConfirmBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('aiGenerateConfirmBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating…';
+            try {
+                const res = await axios.post('/api/templates/generate', {
+                    companyName: document.getElementById('aiCompany').value,
+                    industry: document.getElementById('aiIndustry').value,
+                    goal: document.getElementById('aiGoal').value,
+                    tone: document.getElementById('aiTone').value,
+                    saveAsDefault: document.getElementById('aiSaveDefault').checked,
+                    count: 3,
+                });
+                templates.unshift(res.data);
+                renderTemplates();
+                document.getElementById('templateSelect').value = res.data._id;
+                updatePreview();
+                bootstrap.Modal.getInstance(document.getElementById('aiTemplateModal')).hide();
+                showToast('AI template created — review preview before sending', 'success');
+            } catch (e) {
+                showToast(e.response?.data?.message || 'AI generation failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate';
+            }
+        });
 
         document.getElementById('campaignBulkImportBtn').addEventListener('click', async () => {
             const file = document.getElementById('campaignBulkFile').files[0];

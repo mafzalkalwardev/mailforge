@@ -13,6 +13,8 @@ const {
     getActiveJob,
     getJobById,
     cancelJob,
+    pauseJob,
+    resumeJob,
     listRecentJobs,
 } = require('../controllers/verifyJobController');
 const { protect } = require('../middlewares/authMiddleware');
@@ -30,5 +32,7 @@ router.get('/jobs/recent', protect, listRecentJobs);
 router.post('/jobs', protect, upload.single('file'), startJobFromUpload);
 router.get('/jobs/:id', protect, getJobById);
 router.post('/jobs/:id/cancel', protect, cancelJob);
+router.post('/jobs/:id/pause', protect, pauseJob);
+router.post('/jobs/:id/resume', protect, resumeJob);
 
 module.exports = router;

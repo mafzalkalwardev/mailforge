@@ -17,7 +17,9 @@ function tallyResult(stats, result) {
     }
     const status = String(result.status || '').toLowerCase();
     if (status === 'disposable' || result.misc?.disposable) stats.disposable++;
-    else if (result.mailbox_verified === 'no_smtp' || status === 'no_smtp') stats.noSmtp++;
+    else if (result.mailbox_verified === 'unknown' || status === 'unknown') {
+        stats.noSmtp = (stats.noSmtp || 0) + 1;
+    } else if (result.mailbox_verified === 'no_smtp' || status === 'no_smtp') stats.noSmtp++;
     else stats.invalid++;
 }
 
@@ -67,15 +69,29 @@ async function runVerifyJobWorker(jobId) {
 
     try {
         let job = await VerifyJob.findById(jobId);
-        if (!job || !['queued', 'running'].includes(job.status)) {
+        if (!job || job.status === 'cancelled' || abort.cancelled) {
+            activeWorkers.delete(String(jobId));
+            return;
+        }
+        if (job.status === 'paused') {
+            activeWorkers.delete(String(jobId));
+            return;
+        }
+        if (!['queued', 'running'].includes(job.status)) {
             activeWorkers.delete(String(jobId));
             return;
         }
 
         if (job.status === 'queued') {
-            job.status = 'running';
-            job.startedAt = job.startedAt || new Date();
-            await job.save();
+            const fresh = await VerifyJob.findById(jobId);
+            if (!fresh || fresh.status === 'paused' || fresh.status === 'cancelled') {
+                activeWorkers.delete(String(jobId));
+                return;
+            }
+            fresh.status = 'running';
+            fresh.startedAt = fresh.startedAt || new Date();
+            await fresh.save();
+            job = fresh;
         }
 
         const settings = await getSettingsForUser(job.user);
@@ -84,6 +100,10 @@ async function runVerifyJobWorker(jobId) {
         while (true) {
             job = await VerifyJob.findById(jobId);
             if (!job || job.status === 'cancelled' || abort.cancelled) break;
+            if (job.status === 'paused') {
+                activeWorkers.delete(String(jobId));
+                return;
+            }
             if (job.status !== 'running') break;
 
             const emails = job.emails || [];
@@ -160,6 +180,24 @@ function cancelVerifyJob(jobId) {
     if (abort) abort.cancelled = true;
 }
 
+async function pauseVerifyJob(jobId) {
+    const job = await VerifyJob.findById(jobId);
+    if (!job || !['queued', 'running'].includes(job.status)) return false;
+    job.status = 'paused';
+    await job.save();
+    cancelVerifyJob(jobId);
+    return true;
+}
+
+async function resumeVerifyJob(jobId) {
+    const job = await VerifyJob.findById(jobId);
+    if (!job || job.status !== 'paused') return false;
+    job.status = 'running';
+    await job.save();
+    startVerifyJob(jobId);
+    return true;
+}
+
 function isVerifyJobRunning(jobId) {
     return activeWorkers.has(String(jobId));
 }
@@ -170,6 +208,8 @@ async function resumeInterruptedJobs() {
         console.log(`Resuming verify job ${job._id} (${job.stats?.completed || 0}/${job.emails?.length || 0})`);
         startVerifyJob(job._id);
     }
+    const paused = await VerifyJob.countDocuments({ status: 'paused' });
+    if (paused) console.log(`${paused} verify job(s) paused — resume from Bulk Verify page`);
 }
 
 function buildRecentResults(job, limit = 30) {
@@ -198,6 +238,8 @@ function buildAllRows(job) {
 module.exports = {
     startVerifyJob,
     cancelVerifyJob,
+    pauseVerifyJob,
+    resumeVerifyJob,
     isVerifyJobRunning,
     resumeInterruptedJobs,
     buildRecentResults,

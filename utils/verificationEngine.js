@@ -2,6 +2,7 @@ const axios = require('axios');
 const { mapReacherToReport, checkReacherHealth, REACHER_BASE } = require('./reacherClient');
 const { ensureGoVerifier } = require('./spawnGo');
 const { getSettingsForUser } = require('./settingsService');
+const { applySmtpResponseRules } = require('./smtpResponseRules');
 
 const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const defaultGoBase = (process.env.GO_VERIFIER_URL || 'http://localhost:8082').replace(/\/$/, '');
@@ -39,28 +40,30 @@ async function verifyWithGo(email, settings = {}) {
 function mapStatus(report) {
     if (report.valid) return 'valid';
     if (report.misc?.disposable) return 'disposable';
+    if (report.mailbox_verified === 'unknown') return 'unknown';
     if (report.mailbox_verified === 'no_smtp') return 'no_smtp';
     if (!report.domain_valid) return 'invalid';
     return 'invalid';
 }
 
 function wrapResult(report, email) {
+    const normalized = applySmtpResponseRules({ ...report, email: report.email || email });
     return {
-        email: report.email || email,
-        domain_valid: report.domain_valid,
-        mailbox_verified: report.mailbox_verified,
-        valid: report.valid,
-        checks: report.checks || [],
-        mx_records: report.mx_records || [],
-        misc: report.misc || {},
-        smtp_host: report.smtp_host || '',
-        smtp_response: report.smtp_response || '',
-        verdict_summary: report.verdict_summary || '',
-        syntax_valid: report.syntax_valid,
-        smtp_check_ran: report.smtp_check_ran,
-        engine: report.engine || 'unknown',
-        status: mapStatus(report),
-        report,
+        email: normalized.email || email,
+        domain_valid: normalized.domain_valid,
+        mailbox_verified: normalized.mailbox_verified,
+        valid: normalized.valid,
+        checks: normalized.checks || [],
+        mx_records: normalized.mx_records || [],
+        misc: normalized.misc || {},
+        smtp_host: normalized.smtp_host || '',
+        smtp_response: normalized.smtp_response || '',
+        verdict_summary: normalized.verdict_summary || '',
+        syntax_valid: normalized.syntax_valid,
+        smtp_check_ran: normalized.smtp_check_ran,
+        engine: normalized.engine || 'unknown',
+        status: mapStatus(normalized),
+        report: normalized,
     };
 }
 

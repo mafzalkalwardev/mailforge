@@ -4,6 +4,8 @@ const { parseBulkFile } = require('../utils/csvEmailParser');
 const {
     startVerifyJob,
     cancelVerifyJob,
+    pauseVerifyJob,
+    resumeVerifyJob,
     buildRecentResults,
     buildAllRows,
 } = require('../utils/bulkVerifyWorker');
@@ -52,13 +54,15 @@ const startJobFromUpload = async (req, res) => {
     try {
         const running = await VerifyJob.findOne({
             user: req.user._id,
-            status: { $in: ['queued', 'running'] },
+            status: { $in: ['queued', 'running', 'paused'] },
         });
 
         if (running) {
+            const action = running.status === 'paused' ? 'Resume the paused job or cancel it' : 'Wait for it to finish or cancel it';
             return res.status(409).json({
-                message: 'A verification job is already running. Wait for it to finish or cancel it first.',
+                message: `A verification job is already in progress. ${action} first.`,
                 jobId: running._id,
+                status: running.status,
             });
         }
 
@@ -118,7 +122,7 @@ const getActiveJob = async (req, res) => {
     try {
         const job = await VerifyJob.findOne({
             user: req.user._id,
-            status: { $in: ['queued', 'running'] },
+            status: { $in: ['queued', 'running', 'paused'] },
         }).sort({ createdAt: -1 });
 
         if (!job) return res.json({ active: false, job: null });
@@ -145,7 +149,7 @@ const cancelJob = async (req, res) => {
         const job = await VerifyJob.findOne({ _id: req.params.id, user: req.user._id });
         if (!job) return res.status(404).json({ message: 'Job not found' });
 
-        if (!['queued', 'running'].includes(job.status)) {
+        if (!['queued', 'running', 'paused'].includes(job.status)) {
             return res.status(400).json({ message: `Job is already ${job.status}` });
         }
 
@@ -154,9 +158,52 @@ const cancelJob = async (req, res) => {
         job.completedAt = new Date();
         await job.save();
 
-        res.json({ message: 'Job cancelled', job: serializeJob(job) });
+        res.json({ message: 'Job stopped', job: serializeJob(job) });
     } catch (error) {
-        res.status(500).json({ message: 'Error cancelling job', error: error.message });
+        res.status(500).json({ message: 'Error stopping job', error: error.message });
+    }
+};
+
+const pauseJob = async (req, res) => {
+    try {
+        const job = await VerifyJob.findOne({ _id: req.params.id, user: req.user._id });
+        if (!job) return res.status(404).json({ message: 'Job not found' });
+
+        if (!['queued', 'running'].includes(job.status)) {
+            return res.status(400).json({ message: `Cannot pause — job is ${job.status}` });
+        }
+
+        await pauseVerifyJob(job._id);
+        const updated = await VerifyJob.findById(job._id);
+        res.json({ message: 'Job paused', job: serializeJob(updated) });
+    } catch (error) {
+        res.status(500).json({ message: 'Error pausing job', error: error.message });
+    }
+};
+
+const resumeJob = async (req, res) => {
+    try {
+        const job = await VerifyJob.findOne({ _id: req.params.id, user: req.user._id });
+        if (!job) return res.status(404).json({ message: 'Job not found' });
+
+        if (job.status !== 'paused') {
+            return res.status(400).json({ message: `Job is not paused (status: ${job.status})` });
+        }
+
+        const other = await VerifyJob.findOne({
+            user: req.user._id,
+            _id: { $ne: job._id },
+            status: { $in: ['queued', 'running'] },
+        });
+        if (other) {
+            return res.status(409).json({ message: 'Another verification job is already running' });
+        }
+
+        await resumeVerifyJob(job._id);
+        const updated = await VerifyJob.findById(job._id);
+        res.json({ message: 'Job resumed', job: serializeJob(updated) });
+    } catch (error) {
+        res.status(500).json({ message: 'Error resuming job', error: error.message });
     }
 };
 
@@ -177,5 +224,7 @@ module.exports = {
     getActiveJob,
     getJobById,
     cancelJob,
+    pauseJob,
+    resumeJob,
     listRecentJobs,
 };

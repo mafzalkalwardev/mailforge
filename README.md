@@ -31,10 +31,26 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ## Features
 
-- **Email verification** — syntax, MX, disposable/role checks, live SMTP mailbox dialog
+### Verification
+- **Live SMTP verification** — syntax, MX, disposable/role checks, real RCPT dialog
+- **Strict SMTP validity** — 550/553/503 rejections and IP-block responses are **never** marked valid; blocked checks show as `unknown`
+- **Backend bulk jobs** — upload CSV/XLSX, verification runs on the server; switch tabs freely
+- **Pause / resume / stop** — control long-running verify jobs without losing progress
 - **Bulk CSV / XLSX** — finds emails in any column; valid-only export
-- **Campaigns** — create from verified lists; multi-Gmail rotation; delays, retries, warm-up
-- **Templates** — merge fields: `{Name}`, `{Email}`, `{State}`, `{COMPANY_NAME}`, etc.
+
+### Campaigns & sending
+- **Verify → send pipeline** — auto-redirect to campaign creator when verification completes (toggle in Settings)
+- **Create from verified lists** — valid-only recipients with original CSV columns preserved
+- **Multi-Gmail rotation** — delays, retries, warm-up, bulk sender import
+- **Create & start** — launch a campaign in one click from the wizard
+
+### Templates
+- **4 starter templates** — Default Outreach, Soft Introduction, Follow-Up, Value-First
+- **Merge fields** — `{Name}`, `{Email}`, `{State}`, `{SENDER_NAME}`, `{SENDER_EMAIL}`, `{COMPANY_NAME}`
+- **AI template generator** — OpenAI-powered subject/body variants optimized to avoid spam triggers
+- **Edit & manage** — full CRUD from the Templates page or inline in campaign create
+
+### Inbox & platform
 - **Unified inbox** — IMAP sync from sender accounts; campaign reply matching
 - **JWT auth**, dark mode, per-user settings
 
@@ -42,7 +58,7 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ## Verification engine (recommended)
 
-MailForge uses **truemail-go** as the primary engine — it performs a real SMTP RCPT dialog and captures the **server response text** (550, 250, etc.). This is the best choice when you need to see what the mail server actually said.
+MailForge uses **truemail-go** as the primary engine — it performs a real SMTP RCPT dialog and captures the **server response text** (550, 250, etc.). Results are post-processed so reject codes like `550 5.7.1 Service unavailable` or `553 TSS09` are not counted as valid.
 
 | Engine | SMTP response | Speed | Best for |
 |--------|---------------|-------|----------|
@@ -88,6 +104,17 @@ One-command start (Node + Go verifier):
 npm run start:all
 ```
 
+### Optional: AI templates
+
+Add an OpenAI key in `.env` or **Settings → AI & workflow**:
+
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Then use **AI Generate** on the Templates or Create Campaign pages.
+
 ---
 
 ## Workflow
@@ -102,12 +129,27 @@ flowchart LR
     F --> G[Read replies]
 ```
 
-1. **Bulk Verify** — upload your list
-2. **History** — click the plane icon → **Create Campaign**
-3. **Senders** — add Gmail accounts (App Passwords)
-4. **Templates** — customize outreach copy
-5. **Campaigns** — start and monitor sends
+1. **Bulk Verify** — upload your list; pause/resume as needed
+2. **Auto-redirect** — when done, opens Create Campaign with the verified list loaded
+3. **Templates** — pick a starter template or generate spam-safe copy with AI
+4. **Senders** — add Gmail accounts (App Passwords) or bulk import
+5. **Create & Start** — launch the campaign
 6. **Inbox** — sync and read replies
+
+You can also go **History → plane icon → Create Campaign** at any time.
+
+---
+
+## API highlights
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/verify/jobs` | Start backend bulk verify (CSV/XLSX upload) |
+| `POST /api/verify/jobs/:id/pause` | Pause a running job |
+| `POST /api/verify/jobs/:id/resume` | Resume a paused job |
+| `POST /api/verify/jobs/:id/cancel` | Stop a job |
+| `POST /api/campaigns/from-bulk-job` | Create campaign from verified list |
+| `POST /api/templates/generate` | AI-generate email template |
 
 ---
 
@@ -119,7 +161,8 @@ Browser → Node.js + Express (:5000)
               ├── truemail-go (:8082) — SMTP verification
               ├── Reacher Docker (:8081) — optional fallback
               ├── nodemailer — campaign sending
-              └── imapflow — inbox sync
+              ├── imapflow — inbox sync
+              └── OpenAI API — optional AI templates
 ```
 
 ---
@@ -134,14 +177,18 @@ Browser → Node.js + Express (:5000)
 | `VERIFIER_ENGINE` | `auto` | `auto`, `truemail`, or `reacher` |
 | `GO_VERIFIER_URL` | `http://localhost:8082` | truemail-go API |
 | `ENCRYPTION_KEY` | — | Encrypts sender credentials |
+| `OPENAI_API_KEY` | — | Optional — AI template generation |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model for templates |
 
 See [`.env.example`](.env.example) for all options.
+
+Per-user overrides (verifier URLs, OpenAI key, auto-redirect after verify) are available in **Settings**.
 
 ---
 
 ## GitHub repository
 
-When creating your repo on GitHub, use:
+**https://github.com/mafzalkalwardev/mailforge**
 
 | Field | Value |
 |-------|-------|

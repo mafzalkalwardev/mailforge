@@ -16,7 +16,7 @@ const VerifyJobSchema = new mongoose.Schema(
         resultsByEmail: { type: mongoose.Schema.Types.Mixed, default: {} },
         status: {
             type: String,
-            enum: ['queued', 'running', 'completed', 'failed', 'cancelled'],
+            enum: ['queued', 'running', 'paused', 'completed', 'failed', 'cancelled'],
             default: 'queued',
         },
         nextEmailIndex: { type: Number, default: 0 },

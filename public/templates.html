@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Templates - MailOps</title>
+    <title>Templates - MailForge</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -16,7 +16,7 @@
         <div class="sidebar-brand mb-4">
             <a href="/dashboard.html" class="brand-link">
                 <img src="/favicon.svg" alt="" class="brand-icon" width="36" height="36">
-                <div class="brand-text"><span class="brand-title">MailOps</span></div>
+                <div class="brand-text"><span class="brand-title">MailForge</span></div>
             </a>
         </div>
         <nav class="nav flex-column px-2"></nav>
@@ -24,12 +24,19 @@
 
     <div class="main-content">
         <div class="container-fluid py-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                 <div>
                     <h2 class="fw-bold mb-1">Email Templates</h2>
-                    <p class="text-muted mb-0">Reusable subject and body templates with merge fields</p>
+                    <p class="text-muted mb-0">Reusable subject and body variants — random pick per send reduces spam patterns</p>
                 </div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#templateModal"><i class="fa-solid fa-plus me-2"></i>New Template</button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#aiModal">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i>AI Generate
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#templateModal">
+                        <i class="fa-solid fa-plus me-2"></i>New Template
+                    </button>
+                </div>
             </div>
             <div id="templatesList" class="row g-3"></div>
         </div>
@@ -38,8 +45,9 @@
     <div class="modal fade" id="templateModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Email Template</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header"><h5 class="modal-title" id="tplModalTitle">Email Template</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
+                    <input type="hidden" id="editTplId">
                     <div class="mb-3"><label class="form-label">Name</label><input type="text" id="tplName" class="form-control"></div>
                     <div class="mb-3"><label class="form-label">Company name</label><input type="text" id="tplCompany" class="form-control"></div>
                     <div class="mb-3"><label class="form-label">Subject lines (one per line — one picked at random)</label><textarea id="tplSubjects" class="form-control" rows="3"></textarea></div>
@@ -54,17 +62,70 @@
         </div>
     </div>
 
+    <div class="modal fade" id="aiModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>AI Template Generator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">Creates multiple subject/body variants optimized for inbox placement. Set your OpenAI key in <a href="/settings.html">Settings</a>.</p>
+                    <div class="mb-3"><label class="form-label">Company</label><input id="aiCompany" class="form-control"></div>
+                    <div class="mb-3"><label class="form-label">Industry</label><input id="aiIndustry" class="form-control" placeholder="logistics, trucking…"></div>
+                    <div class="mb-3"><label class="form-label">Goal</label><input id="aiGoal" class="form-control" placeholder="start a conversation"></div>
+                    <div class="mb-3">
+                        <label class="form-label">Tone</label>
+                        <select id="aiTone" class="form-select">
+                            <option>professional and friendly</option>
+                            <option>direct and concise</option>
+                            <option>warm and conversational</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="aiGenBtn">Generate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/sidebar.js"></script>
     <script src="/js/main.js"></script>
     <script>
+        function openEditModal(t) {
+            document.getElementById('editTplId').value = t._id;
+            document.getElementById('tplModalTitle').textContent = 'Edit Template';
+            document.getElementById('tplName').value = t.name;
+            document.getElementById('tplCompany').value = t.companyName || '';
+            document.getElementById('tplSubjects').value = (t.subjectTemplates || []).join('\n');
+            document.getElementById('tplBodies').value = (t.bodyTemplates || []).join('\n---\n');
+            new bootstrap.Modal(document.getElementById('templateModal')).show();
+        }
+
+        function clearModal() {
+            document.getElementById('editTplId').value = '';
+            document.getElementById('tplModalTitle').textContent = 'New Template';
+            document.getElementById('tplName').value = '';
+            document.getElementById('tplCompany').value = '';
+            document.getElementById('tplSubjects').value = '';
+            document.getElementById('tplBodies').value = '';
+        }
+
         async function loadTemplates() {
             const el = document.getElementById('templatesList');
             const res = await axios.get('/api/templates');
             el.innerHTML = res.data.map(t => `<div class="col-md-6"><div class="glass-card p-4 h-100">
-                <div class="d-flex justify-content-between"><h5>${t.name}${t.isDefault ? ' <span class="badge bg-primary">Default</span>' : ''}</h5>
-                <button class="btn btn-sm btn-outline-danger del-tpl" data-id="${t._id}"><i class="fa-solid fa-trash"></i></button></div>
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <h5 class="mb-1">${t.name}${t.isDefault ? ' <span class="badge bg-primary">Default</span>' : ''}</h5>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-primary edit-tpl" data-id="${t._id}"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger del-tpl" data-id="${t._id}"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
                 <p class="text-muted small mb-2">${t.companyName || 'No company name'}</p>
                 <p class="small mb-0"><strong>${(t.subjectTemplates||[]).length}</strong> subjects · <strong>${(t.bodyTemplates||[]).length}</strong> bodies</p>
             </div></div>`).join('') || '<p class="text-muted">No templates</p>';
@@ -74,7 +135,13 @@
                 await axios.delete(`/api/templates/${btn.dataset.id}`);
                 loadTemplates();
             }));
+            el.querySelectorAll('.edit-tpl').forEach(btn => btn.addEventListener('click', () => {
+                const t = res.data.find(x => x._id === btn.dataset.id);
+                if (t) openEditModal(t);
+            }));
         }
+
+        document.querySelector('[data-bs-target="#templateModal"]').addEventListener('click', clearModal);
 
         document.getElementById('saveTplBtn').addEventListener('click', async () => {
             const subjects = document.getElementById('tplSubjects').value.split('\n').map(s => s.trim()).filter(Boolean);
@@ -82,15 +149,44 @@
             if (!document.getElementById('tplName').value || !subjects.length || !bodies.length) {
                 return showToast('Name, subjects, and bodies required', 'error');
             }
-            await axios.post('/api/templates', {
+            const payload = {
                 name: document.getElementById('tplName').value,
                 companyName: document.getElementById('tplCompany').value,
                 subjectTemplates: subjects,
                 bodyTemplates: bodies,
-            });
+            };
+            const editId = document.getElementById('editTplId').value;
+            if (editId) {
+                await axios.put(`/api/templates/${editId}`, payload);
+            } else {
+                await axios.post('/api/templates', payload);
+            }
             bootstrap.Modal.getInstance(document.getElementById('templateModal')).hide();
             showToast('Template saved', 'success');
             loadTemplates();
+        });
+
+        document.getElementById('aiGenBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('aiGenBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating…';
+            try {
+                await axios.post('/api/templates/generate', {
+                    companyName: document.getElementById('aiCompany').value,
+                    industry: document.getElementById('aiIndustry').value,
+                    goal: document.getElementById('aiGoal').value,
+                    tone: document.getElementById('aiTone').value,
+                    count: 3,
+                });
+                bootstrap.Modal.getInstance(document.getElementById('aiModal')).hide();
+                showToast('AI template created', 'success');
+                loadTemplates();
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Generation failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate';
+            }
         });
 
         document.addEventListener('DOMContentLoaded', loadTemplates);

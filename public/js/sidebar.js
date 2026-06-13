@@ -56,6 +56,8 @@
             let badge = document.getElementById('verifyJobIndicator');
             if (res.data.active && res.data.job) {
                 const p = res.data.job.progress || {};
+                const job = res.data.job;
+                const isPaused = job.status === 'paused';
                 if (!badge) {
                     badge = document.createElement('div');
                     badge.id = 'verifyJobIndicator';
@@ -65,7 +67,10 @@
                     const nav = document.querySelector('.sidebar nav.nav');
                     if (nav) nav.insertAdjacentElement('afterend', badge);
                 }
-                badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying ${p.completed}/${p.total} <a href="/bulk.html" class="ms-1">view</a>`;
+                const icon = isPaused
+                    ? '<i class="fa-solid fa-pause me-1"></i> Paused'
+                    : '<i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying';
+                badge.innerHTML = `${icon} ${p.completed}/${p.total} <a href="/bulk.html" class="ms-1">view</a>`;
                 badge.classList.remove('d-none');
             } else if (badge) {
                 badge.classList.add('d-none');

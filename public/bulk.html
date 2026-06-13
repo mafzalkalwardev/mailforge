@@ -56,7 +56,9 @@
                 <span><i class="fa-solid fa-server me-2"></i><span id="activeJobBannerText">Verification running in background...</span></span>
                 <div class="d-flex gap-2">
                     <a href="/bulk.html" class="btn btn-sm btn-primary">View progress</a>
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="cancelJobBtn">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning d-none" id="bannerPauseBtn">Pause</button>
+                    <button type="button" class="btn btn-sm btn-outline-success d-none" id="bannerResumeBtn">Resume</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="cancelJobBtn">Stop</button>
                 </div>
             </div>
         </div>
@@ -90,7 +92,20 @@
                     <div class="progress mb-2">
                         <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div>
                     </div>
-                    <p id="statusLine" class="small text-muted mb-4">Starting...</p>
+                    <p id="statusLine" class="small text-muted mb-3">Starting...</p>
+
+                    <div id="jobControlBtns" class="d-flex gap-2 flex-wrap mb-4 d-none">
+                        <button type="button" class="btn btn-outline-warning" id="pauseJobBtn"><i class="fa-solid fa-pause me-1"></i>Pause</button>
+                        <button type="button" class="btn btn-outline-success d-none" id="resumeJobBtn"><i class="fa-solid fa-play me-1"></i>Resume</button>
+                        <button type="button" class="btn btn-outline-danger" id="stopJobBtn"><i class="fa-solid fa-stop me-1"></i>Stop</button>
+                    </div>
+
+                    <div id="redirectBanner" class="alert alert-success d-none mb-4">
+                        <i class="fa-solid fa-paper-plane me-2"></i>
+                        Verification complete — opening campaign sender in <strong id="redirectCountdown">5</strong>s…
+                        <a id="redirectNowLink" href="#" class="alert-link ms-2">Go now</a>
+                        <button type="button" class="btn btn-sm btn-outline-success ms-2" id="cancelRedirectBtn">Stay here</button>
+                    </div>
 
                     <div class="row g-3 mb-4">
                         <div class="col-6 col-md-3"><div class="mini-stat-card border border-success text-success"><div class="small fw-normal opacity-75">Valid</div><div id="pValid">0</div></div></div>
@@ -130,8 +145,10 @@
     <script src="/js/main.js"></script>
     <script>
         let pollTimer = null;
+        let redirectTimer = null;
         let currentJobId = null;
         let allRows = [];
+        let userSettings = { autoRedirectAfterVerify: true };
 
         const uploadForm = document.getElementById('uploadForm');
         const fileInput = document.getElementById('fileInput');
@@ -145,8 +162,9 @@
             return `<span class="badge ${val ? 'bg-success' : 'bg-danger'}">${val ? 'yes' : 'no'}</span>`;
         }
         function mailboxBadge(val) {
-            const map = { yes: 'bg-success', no: 'bg-danger', no_smtp: 'bg-warning text-dark' };
-            return `<span class="badge ${map[val] || 'bg-secondary'}">${val || '—'}</span>`;
+            const map = { yes: 'bg-success', no: 'bg-danger', no_smtp: 'bg-warning text-dark', unknown: 'bg-secondary' };
+            const labels = { yes: 'yes', no: 'no', no_smtp: 'unavail', unknown: 'unknown' };
+            return `<span class="badge ${map[val] || 'bg-secondary'}">${labels[val] || val || '—'}</span>`;
         }
         function truncate(str, n = 48) {
             if (!str) return '—';
@@ -164,20 +182,32 @@
             document.getElementById('progressBar').style.width = (p.percent ?? 0) + '%';
 
             const statusLine = document.getElementById('statusLine');
-            if (job.status === 'running' || job.status === 'queued') {
+            const isActive = ['queued', 'running'].includes(job.status);
+            const isPaused = job.status === 'paused';
+
+            if (isActive) {
                 statusLine.textContent = 'Running on server — you can switch tabs or close this page.';
+                uploadBtn.disabled = true;
+            } else if (isPaused) {
+                statusLine.textContent = `Paused at ${p.completed}/${p.total}. Click Resume to continue.`;
                 uploadBtn.disabled = true;
             } else if (job.status === 'completed') {
                 statusLine.textContent = 'Verification complete. Results saved to History.';
                 uploadBtn.disabled = false;
                 uploadBtn.innerHTML = '<i class="fa-solid fa-rotate me-2"></i>Verify Another File';
             } else if (job.status === 'cancelled') {
-                statusLine.textContent = 'Job cancelled.';
+                statusLine.textContent = 'Verification stopped.';
                 uploadBtn.disabled = false;
             } else if (job.status === 'failed') {
                 statusLine.textContent = 'Job failed: ' + (job.lastError || 'Unknown error');
                 uploadBtn.disabled = false;
             }
+
+            document.getElementById('jobControlBtns').classList.toggle('d-none', !isActive && !isPaused);
+            document.getElementById('pauseJobBtn').classList.toggle('d-none', !isActive);
+            document.getElementById('resumeJobBtn').classList.toggle('d-none', !isPaused);
+            document.getElementById('bannerPauseBtn').classList.toggle('d-none', !isActive);
+            document.getElementById('bannerResumeBtn').classList.toggle('d-none', !isPaused);
 
             document.getElementById('fileNameText').textContent = job.fileName || '';
             document.getElementById('fileNameDisplay').classList.remove('d-none');
@@ -203,11 +233,40 @@
                 createCampaignBtn.href = `/campaign-create.html?bulkJobId=${job.bulkJobId}`;
             }
 
-            document.getElementById('activeJobBanner').classList.toggle('d-none', !['queued', 'running'].includes(job.status));
-            if (['queued', 'running'].includes(job.status)) {
+            document.getElementById('activeJobBanner').classList.toggle('d-none', !isActive && !isPaused);
+            if (isActive || isPaused) {
+                const label = isPaused ? 'Paused' : 'Running';
                 document.getElementById('activeJobBannerText').textContent =
-                    `${job.fileName}: ${p.completed}/${p.total} (${p.percent}%) — running on server`;
+                    `${job.fileName}: ${p.completed}/${p.total} (${p.percent}%) — ${label.toLowerCase()} on server`;
             }
+        }
+
+        function clearRedirectTimer() {
+            if (redirectTimer) {
+                clearInterval(redirectTimer);
+                redirectTimer = null;
+            }
+            document.getElementById('redirectBanner').classList.add('d-none');
+        }
+
+        function scheduleCampaignRedirect(bulkJobId, fileName) {
+            if (!bulkJobId || !userSettings.autoRedirectAfterVerify) return;
+            clearRedirectTimer();
+            const banner = document.getElementById('redirectBanner');
+            const countdownEl = document.getElementById('redirectCountdown');
+            const target = `/campaign-create.html?bulkJobId=${bulkJobId}&fromVerify=1&validOnly=1`;
+            document.getElementById('redirectNowLink').href = target;
+            banner.classList.remove('d-none');
+            let sec = 5;
+            countdownEl.textContent = sec;
+            redirectTimer = setInterval(() => {
+                sec--;
+                countdownEl.textContent = sec;
+                if (sec <= 0) {
+                    clearRedirectTimer();
+                    window.location.href = target;
+                }
+            }, 1000);
         }
 
         function stopPolling() {
@@ -234,9 +293,13 @@
                         const full = await axios.get(`/api/verify/jobs/${jobId}?full=1`);
                         allRows = full.data.rows || [];
                         showToast('Bulk verification complete!', 'success');
+                        scheduleCampaignRedirect(job.bulkJobId, job.fileName);
                     } else if (['failed', 'cancelled'].includes(job.status)) {
                         stopPolling();
                         BulkJob.clearActiveJobId();
+                        clearRedirectTimer();
+                    } else if (job.status === 'paused') {
+                        stopPolling();
                     }
                 } catch (err) {
                     console.warn('Poll error', err);
@@ -272,8 +335,14 @@
             } catch (err) {
                 const msg = err.response?.data?.message || 'Failed to start job';
                 if (err.response?.status === 409 && err.response?.data?.jobId) {
-                    showToast('Job already running — resuming', 'info');
-                    startPolling(err.response.data.jobId);
+                    const st = err.response.data.status;
+                    showToast(st === 'paused' ? 'Job paused — resume or stop it first' : 'Job already running — resuming', 'info');
+                    if (st !== 'paused') startPolling(err.response.data.jobId);
+                    else {
+                        currentJobId = err.response.data.jobId;
+                        const res = await axios.get(`/api/verify/jobs/${currentJobId}`);
+                        updateUI(res.data);
+                    }
                 } else {
                     showToast(msg, 'error');
                     uploadBtn.disabled = false;
@@ -282,18 +351,36 @@
             }
         });
 
-        document.getElementById('cancelJobBtn')?.addEventListener('click', async () => {
+        async function jobAction(path, msg) {
             if (!currentJobId) return;
-            if (!confirm('Cancel verification job?')) return;
             try {
-                await axios.post(`/api/verify/jobs/${currentJobId}/cancel`);
-                showToast('Job cancelled', 'info');
-                stopPolling();
-                BulkJob.clearActiveJobId();
+                const res = await axios.post(`/api/verify/jobs/${currentJobId}${path}`);
+                showToast(msg, 'success');
+                updateUI(res.data.job);
+                if (path === '/resume') startPolling(currentJobId);
+                if (path === '/cancel') {
+                    stopPolling();
+                    BulkJob.clearActiveJobId();
+                }
+                if (path === '/pause') stopPolling();
             } catch (e) {
-                showToast(e.response?.data?.message || 'Cancel failed', 'error');
+                showToast(e.response?.data?.message || 'Action failed', 'error');
             }
+        }
+
+        document.getElementById('cancelJobBtn')?.addEventListener('click', () => {
+            if (!currentJobId || !confirm('Stop verification? Progress so far is kept but the job will not finish.')) return;
+            jobAction('/cancel', 'Verification stopped');
         });
+        document.getElementById('stopJobBtn')?.addEventListener('click', () => {
+            if (!currentJobId || !confirm('Stop verification?')) return;
+            jobAction('/cancel', 'Verification stopped');
+        });
+        document.getElementById('pauseJobBtn')?.addEventListener('click', () => jobAction('/pause', 'Verification paused'));
+        document.getElementById('bannerPauseBtn')?.addEventListener('click', () => jobAction('/pause', 'Verification paused'));
+        document.getElementById('resumeJobBtn')?.addEventListener('click', () => jobAction('/resume', 'Verification resumed'));
+        document.getElementById('bannerResumeBtn')?.addEventListener('click', () => jobAction('/resume', 'Verification resumed'));
+        document.getElementById('cancelRedirectBtn')?.addEventListener('click', clearRedirectTimer);
 
         document.getElementById('dropZone').addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', () => {
@@ -314,15 +401,27 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                const settingsRes = await axios.get('/api/settings');
+                userSettings = settingsRes.data || userSettings;
+            } catch (_) {}
+
+            try {
                 const active = await axios.get('/api/verify/jobs/active');
                 if (active.data.active && active.data.job) {
-                    startPolling(active.data.job._id);
+                    currentJobId = active.data.job._id;
+                    updateUI(active.data.job);
+                    if (['queued', 'running'].includes(active.data.job.status)) {
+                        startPolling(active.data.job._id);
+                    }
                 } else {
                     const savedId = BulkJob.loadActiveJobId();
                     if (savedId) {
                         const res = await axios.get(`/api/verify/jobs/${savedId}`);
                         if (['queued', 'running'].includes(res.data.status)) {
                             startPolling(savedId);
+                        } else if (res.data.status === 'paused') {
+                            currentJobId = savedId;
+                            updateUI(res.data);
                         } else if (res.data.status === 'completed') {
                             currentJobId = savedId;
                             allRows = res.data.rows || [];

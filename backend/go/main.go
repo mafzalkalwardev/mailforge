@@ -113,6 +113,71 @@ func isConnectionError(msg string) bool {
 		strings.Contains(lower, "i/o")
 }
 
+func containsAny(lower string, phrases []string) bool {
+	for _, p := range phrases {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func smtpResponseHasRejectCode(lower string) bool {
+	codes := []string{"550", "551", "552", "553", "554", "503", "521", "522", "571", "572"}
+	for _, c := range codes {
+		if strings.Contains(lower, c) {
+			return true
+		}
+	}
+	return false
+}
+
+// finalizeVerdict applies strict rules: SMTP 550/553/503 and IP-block messages are never "valid".
+func finalizeVerdict(email string, mailboxVerified string, smtpResponse string, domainValid bool) (string, bool, string) {
+	lower := strings.ToLower(strings.TrimSpace(smtpResponse))
+
+	if lower != "" {
+		has250 := strings.Contains(lower, "250")
+		hasReject := smtpResponseHasRejectCode(lower)
+		hasBlocked := containsAny(lower, []string{
+			"service unavailable", "access denied", "client host", "sender address rejected",
+			"does not accept mail", "nullmx", "blocked", "tss09", "tss11", "spamhaus",
+			"blacklist", "not permitted", "relay access denied",
+		})
+		hasMailboxGone := containsAny(lower, []string{
+			"user unknown", "mailbox not found", "does not exist", "no such user",
+			"invalid recipient", "recipient address rejected", "unknown user", "account disabled",
+		})
+
+		if has250 && !hasReject && !hasBlocked {
+			return "yes", true, email + " seems to be valid"
+		}
+
+		if hasReject || hasBlocked || hasMailboxGone {
+			mv := "no"
+			summary := email + " seems not to be valid"
+			if hasBlocked && !hasMailboxGone {
+				mv = "unknown"
+				summary = email + " — could not verify (mail server blocked our IP / sender)"
+			}
+			return mv, false, summary
+		}
+	}
+
+	valid := mailboxVerified == "yes"
+	summary := email + " seems to be valid"
+	if !valid {
+		summary = email + " seems not to be valid"
+	}
+	if mailboxVerified == "unknown" {
+		summary = email + " — could not verify (mail server blocked our IP / sender)"
+	}
+	if mailboxVerified == "no_smtp" && domainValid {
+		summary = email + " — domain OK but mailbox could not be verified (SMTP blocked or unavailable)"
+	}
+	return mailboxVerified, valid, summary
+}
+
 func extractSmtpErrors(result *truemail.ValidatorResult) (host, response string, rcptAttempted bool) {
 	for _, req := range result.SmtpDebug {
 		if req.Host != "" {
@@ -214,6 +279,9 @@ func verifyEmailAddress(email string) (*verifyResponse, error) {
 
 	if result.Success {
 		mailboxVerified = "yes"
+		if smtpResponse != "" && smtpResponseHasRejectCode(strings.ToLower(smtpResponse)) {
+			mailboxVerified = "no"
+		}
 		if smtpHost != "" {
 			checks = append(checks, checkItem{
 				Step: "smtp", Passed: true,
@@ -271,6 +339,8 @@ func verifyEmailAddress(email string) (*verifyResponse, error) {
 	if mailboxVerified == "no_smtp" && domainValid {
 		summary = email + " — domain OK but mailbox could not be verified (SMTP blocked or unavailable)"
 	}
+
+	mailboxVerified, valid, summary = finalizeVerdict(email, mailboxVerified, smtpResponse, domainValid)
 
 	return &verifyResponse{
 		Email:           email,

@@ -21,6 +21,8 @@ function defaultSettings() {
         smtpProxy: process.env.SMTP_PROXY || '',
         bulkConcurrency: Math.min(parseInt(process.env.BULK_CONCURRENCY || '3', 10), 5),
         reacherTimeoutMs: parseInt(process.env.REACHER_TIMEOUT_MS || '45000', 10),
+        openaiApiKey: process.env.OPENAI_API_KEY || '',
+        autoRedirectAfterVerify: true,
     };
 }
 
@@ -38,6 +40,8 @@ function sanitizeSettings(input = {}) {
         smtpProxy: String(input.smtpProxy ?? defaults.smtpProxy ?? '').trim(),
         bulkConcurrency: Number.isFinite(bulkConcurrency) ? Math.min(Math.max(bulkConcurrency, 1), 5) : 3,
         reacherTimeoutMs: Number.isFinite(reacherTimeoutMs) ? Math.min(Math.max(reacherTimeoutMs, 5000), 180000) : 45000,
+        openaiApiKey: String(input.openaiApiKey ?? defaults.openaiApiKey ?? '').trim(),
+        autoRedirectAfterVerify: input.autoRedirectAfterVerify !== false,
     };
 }
 
@@ -52,7 +56,12 @@ async function getSettingsForUser(userId) {
 }
 
 async function saveSettingsForUser(userId, input) {
-    const settings = sanitizeSettings(input);
+    const existing = await AppSettings.findOne({ user: userId }).lean();
+    const merged = { ...defaultSettings(), ...(existing || {}), ...input };
+    if (!input.openaiApiKey && existing?.openaiApiKey) {
+        merged.openaiApiKey = existing.openaiApiKey;
+    }
+    const settings = sanitizeSettings(merged);
     const saved = await AppSettings.findOneAndUpdate(
         { user: userId },
         { $set: settings },
