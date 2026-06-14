@@ -1,6 +1,6 @@
 {
   "name": "@mafzalkalwardev/mailforge",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "MailForge — self-hosted email verify, campaign send, and unified inbox",
   "main": "server.js",
   "repository": {
