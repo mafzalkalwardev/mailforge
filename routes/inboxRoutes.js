@@ -10,6 +10,7 @@ const {
     inboxStats,
     listSenderAccounts,
     replyToMessage,
+    setLeadTag,
 } = require('../controllers/inboxController');
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.get('/', listMessages);
 router.post('/:id/star', toggleStar);
 router.post('/:id/important', toggleImportant);
 router.post('/:id/reply', replyToMessage);
+router.post('/:id/lead-tag', setLeadTag);
 router.post('/:id/read', markRead);
 router.get('/:id', getMessage);
 

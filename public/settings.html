@@ -140,6 +140,41 @@
                     </div>
                 </div>
 
+                <div class="glass-card p-4 mb-4">
+                    <h5 class="mb-3 fw-bold"><i class="fa-solid fa-truck-fast me-2 gradient-text"></i>Deliverability &amp; sending</h5>
+                    <form id="deliverabilitySettingsForm" class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">CAN-SPAM physical address</label>
+                            <input id="canSpamAddress" type="text" class="form-control" placeholder="123 Main St, City, ST 12345">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="appendCanSpamFooter">
+                                <label class="form-check-label" for="appendCanSpamFooter">Append CAN-SPAM footer to campaign emails</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Max sends per hour (0 = unlimited)</label>
+                            <input id="maxSendsPerHour" type="number" min="0" max="5000" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Auto-pause sender at failure %</label>
+                            <input id="senderFailurePausePercent" type="number" min="0" max="100" class="form-control" value="25">
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="savePartialOnPause" checked>
+                                <label class="form-check-label" for="savePartialOnPause">Save partial list when verify is paused/stopped</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> Save Deliverability Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="glass-card p-4">
                     <h5 class="mb-3 fw-bold"><i class="fa-solid fa-wand-magic-sparkles me-2 gradient-text"></i>AI &amp; workflow</h5>
                     <form id="workflowSettingsForm" class="row g-3">
@@ -189,6 +224,7 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/engine-ui.js"></script>
     <script src="/js/sidebar.js"></script>
+    <script src="/js/persistence-banner.js"></script>
     <script src="/js/main.js"></script>
     <script>
         function renderCompareTable() {
@@ -237,6 +273,21 @@
             }
             if (document.getElementById('autoRedirectAfterVerify')) {
                 document.getElementById('autoRedirectAfterVerify').checked = settings.autoRedirectAfterVerify !== false;
+            }
+            if (document.getElementById('canSpamAddress')) {
+                document.getElementById('canSpamAddress').value = settings.canSpamAddress || '';
+            }
+            if (document.getElementById('appendCanSpamFooter')) {
+                document.getElementById('appendCanSpamFooter').checked = settings.appendCanSpamFooter === true;
+            }
+            if (document.getElementById('maxSendsPerHour')) {
+                document.getElementById('maxSendsPerHour').value = settings.maxSendsPerHour ?? 0;
+            }
+            if (document.getElementById('senderFailurePausePercent')) {
+                document.getElementById('senderFailurePausePercent').value = settings.senderFailurePausePercent ?? 25;
+            }
+            if (document.getElementById('savePartialOnPause')) {
+                document.getElementById('savePartialOnPause').checked = settings.savePartialOnPause !== false;
             }
         }
 
@@ -314,6 +365,23 @@
 
         document.getElementById('engineSettingsForm').addEventListener('submit', saveSettings);
         document.getElementById('refreshHealthBtn').addEventListener('click', checkEngineHealth);
+
+        document.getElementById('deliverabilitySettingsForm')?.addEventListener('submit', async e => {
+            e.preventDefault();
+            try {
+                const res = await axios.put('/api/settings', {
+                    canSpamAddress: document.getElementById('canSpamAddress').value.trim(),
+                    appendCanSpamFooter: document.getElementById('appendCanSpamFooter').checked,
+                    maxSendsPerHour: Number(document.getElementById('maxSendsPerHour').value || 0),
+                    senderFailurePausePercent: Number(document.getElementById('senderFailurePausePercent').value || 25),
+                    savePartialOnPause: document.getElementById('savePartialOnPause').checked,
+                });
+                fillSettingsForm(res.data);
+                showToast('Deliverability settings saved.', 'success');
+            } catch (err) {
+                showToast(err.response?.data?.message || 'Could not save settings.', 'error');
+            }
+        });
 
         document.getElementById('workflowSettingsForm')?.addEventListener('submit', async e => {
             e.preventDefault();

@@ -21,6 +21,8 @@ const BulkJobSchema = new mongoose.Schema({
         noSmtp: { type: Number, default: 0 },
     },
     completedAt: { type: Date, default: Date.now },
+    isPartial: { type: Boolean, default: false },
+    verifyJobId: { type: mongoose.Schema.Types.ObjectId, ref: 'VerifyJob' },
 });
 
 module.exports = mongoose.model('BulkJob', BulkJobSchema);

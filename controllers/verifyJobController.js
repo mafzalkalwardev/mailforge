@@ -8,16 +8,21 @@ const {
     resumeVerifyJob,
     buildRecentResults,
     buildAllRows,
+    saveToBulkHistory,
 } = require('../utils/bulkVerifyWorker');
+const { getSettingsForUser } = require('../utils/settingsService');
 
 function jobProgress(job) {
     const total = job.stats?.totalEmails || job.emails?.length || 0;
     const completed = job.stats?.completed || 0;
-    return {
-        total,
-        completed,
-        percent: total ? Math.round((completed / total) * 100) : 0,
-    };
+    const percent = total ? Math.round((completed / total) * 100) : 0;
+    let etaSeconds = null;
+    if (job.startedAt && completed > 0 && completed < total) {
+        const elapsed = (Date.now() - new Date(job.startedAt).getTime()) / 1000;
+        const perEmail = elapsed / completed;
+        etaSeconds = Math.round(perEmail * (total - completed));
+    }
+    return { total, completed, percent, etaSeconds };
 }
 
 function serializeJob(job, { includeRows = false } = {}) {
@@ -153,12 +158,24 @@ const cancelJob = async (req, res) => {
             return res.status(400).json({ message: `Job is already ${job.status}` });
         }
 
+        const savePartial = req.body?.savePartial !== false;
         cancelVerifyJob(job._id);
         job.status = 'cancelled';
         job.completedAt = new Date();
         await job.save();
 
-        res.json({ message: 'Job stopped', job: serializeJob(job) });
+        let bulkJobId = job.bulkJobId;
+        if (savePartial && !bulkJobId && (job.stats?.completed || 0) > 0) {
+            try {
+                const refreshed = await VerifyJob.findById(job._id);
+                bulkJobId = await saveToBulkHistory(refreshed, { partial: true });
+            } catch (err) {
+                console.warn('Partial save on cancel failed:', err.message);
+            }
+        }
+
+        const updated = await VerifyJob.findById(job._id);
+        res.json({ message: bulkJobId ? 'Job stopped — partial list saved' : 'Job stopped', job: serializeJob(updated), bulkJobId });
     } catch (error) {
         res.status(500).json({ message: 'Error stopping job', error: error.message });
     }
@@ -173,9 +190,27 @@ const pauseJob = async (req, res) => {
             return res.status(400).json({ message: `Cannot pause — job is ${job.status}` });
         }
 
+        const settings = await getSettingsForUser(req.user._id);
+        const savePartial = req.body?.savePartial ?? settings.savePartialOnPause !== false;
+
         await pauseVerifyJob(job._id);
-        const updated = await VerifyJob.findById(job._id);
-        res.json({ message: 'Job paused', job: serializeJob(updated) });
+        let updated = await VerifyJob.findById(job._id);
+
+        let bulkJobId = updated.bulkJobId;
+        if (savePartial && !bulkJobId && (updated.stats?.completed || 0) > 0) {
+            try {
+                bulkJobId = await saveToBulkHistory(updated, { partial: true });
+                updated = await VerifyJob.findById(job._id);
+            } catch (err) {
+                console.warn('Partial save on pause failed:', err.message);
+            }
+        }
+
+        res.json({
+            message: bulkJobId ? 'Job paused — progress saved as campaign list' : 'Job paused',
+            job: serializeJob(updated),
+            bulkJobId,
+        });
     } catch (error) {
         res.status(500).json({ message: 'Error pausing job', error: error.message });
     }

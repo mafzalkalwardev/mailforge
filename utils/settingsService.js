@@ -27,6 +27,11 @@ function defaultSettings() {
         aiProvider: (process.env.AI_PROVIDER || 'groq').toLowerCase(),
         aiModel: process.env.AI_MODEL || '',
         autoRedirectAfterVerify: true,
+        canSpamAddress: '',
+        appendCanSpamFooter: false,
+        maxSendsPerHour: 0,
+        senderFailurePausePercent: 25,
+        savePartialOnPause: true,
     };
 }
 
@@ -52,6 +57,11 @@ function sanitizeSettings(input = {}) {
             : 'groq',
         aiModel: String(input.aiModel ?? defaults.aiModel ?? '').trim(),
         autoRedirectAfterVerify: input.autoRedirectAfterVerify !== false,
+        canSpamAddress: String(input.canSpamAddress ?? defaults.canSpamAddress ?? '').trim(),
+        appendCanSpamFooter: input.appendCanSpamFooter === true,
+        maxSendsPerHour: Math.max(0, parseInt(input.maxSendsPerHour ?? defaults.maxSendsPerHour ?? 0, 10) || 0),
+        senderFailurePausePercent: Math.min(100, Math.max(0, parseInt(input.senderFailurePausePercent ?? defaults.senderFailurePausePercent ?? 25, 10) || 25)),
+        savePartialOnPause: input.savePartialOnPause !== false,
     };
 }
 

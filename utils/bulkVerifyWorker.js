@@ -35,25 +35,46 @@ function resultToRow(result, fileRow) {
     };
 }
 
-async function saveToBulkHistory(job) {
-    const rows = (job.fileRows || []).map(fr => {
-        const r = job.resultsByEmail[fr.email] || {};
-        return resultToRow(r, fr);
-    });
+async function saveToBulkHistory(job, { partial = false } = {}) {
+    const rows = (job.fileRows || [])
+        .map(fr => {
+            const r = job.resultsByEmail[fr.email];
+            if (!r && partial) return null;
+            if (!r) {
+                return {
+                    email: fr.email,
+                    originalRow: fr.originalRow || [],
+                    valid: false,
+                    domain_valid: false,
+                    mailbox_verified: 'no_smtp',
+                    smtp_response: '',
+                    status: 'pending',
+                };
+            }
+            return resultToRow(r, fr);
+        })
+        .filter(Boolean);
+
+    if (!rows.length) return null;
+
+    const completedRows = rows.filter(r => r.status !== 'pending');
+    const stats = {
+        total: rows.length,
+        valid: completedRows.filter(r => r.valid).length,
+        invalid: completedRows.filter(r => !r.valid && !['unknown', 'no_smtp'].includes(String(r.mailbox_verified))).length,
+        disposable: completedRows.filter(r => String(r.status).toLowerCase() === 'disposable').length,
+        noSmtp: completedRows.filter(r => ['unknown', 'no_smtp'].includes(String(r.mailbox_verified))).length,
+    };
 
     const bulk = await BulkJob.create({
         user: job.user,
-        fileName: job.fileName,
+        fileName: partial ? `${job.fileName} (partial ${job.stats?.completed || 0}/${job.stats?.totalEmails || 0})` : job.fileName,
         headers: job.headers || [],
         rows,
-        stats: {
-            total: rows.length,
-            valid: job.stats.valid,
-            invalid: job.stats.invalid,
-            disposable: job.stats.disposable,
-            noSmtp: job.stats.noSmtp,
-        },
+        stats,
         completedAt: new Date(),
+        isPartial: partial,
+        verifyJobId: job._id,
     });
 
     job.bulkJobId = bulk._id;
@@ -244,4 +265,5 @@ module.exports = {
     resumeInterruptedJobs,
     buildRecentResults,
     buildAllRows,
+    saveToBulkHistory,
 };

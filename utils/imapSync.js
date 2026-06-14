@@ -3,6 +3,34 @@ const SenderAccount = require('../models/SenderAccount');
 const InboxMessage = require('../models/InboxMessage');
 const Campaign = require('../models/Campaign');
 const { decrypt } = require('./crypto');
+const { addSuppression } = require('./suppressionService');
+
+const BOUNCE_FROM_PATTERNS = ['mailer-daemon', 'postmaster', 'mail delivery', 'noreply'];
+const BOUNCE_SUBJECT_PATTERNS = ['delivery status', 'undeliverable', 'failure notice', 'returned mail', 'delivery failure'];
+const BOUNCE_BODY_PATTERNS = ['550', 'user unknown', 'mailbox not found', 'address rejected', 'does not exist'];
+
+function detectBounce(from, subject, body) {
+    const f = String(from || '').toLowerCase();
+    const s = String(subject || '').toLowerCase();
+    const b = String(body || '').toLowerCase();
+    if (BOUNCE_FROM_PATTERNS.some(p => f.includes(p))) return true;
+    if (BOUNCE_SUBJECT_PATTERNS.some(p => s.includes(p))) return true;
+    if (BOUNCE_SUBJECT_PATTERNS.some(p => s.includes(p)) && BOUNCE_BODY_PATTERNS.some(p => b.includes(p))) return true;
+    return BOUNCE_SUBJECT_PATTERNS.some(p => s.includes(p)) || (BOUNCE_BODY_PATTERNS.filter(p => b.includes(p)).length >= 2);
+}
+
+function extractBouncedEmail(body, subject) {
+    const text = `${subject || ''}\n${body || ''}`;
+    const m = text.match(/[\w.+-]+@[\w.-]+\.\w{2,}/gi);
+    if (!m) return null;
+    const filtered = m.map(e => e.toLowerCase()).filter(e => !e.includes('mailer-daemon') && !e.includes('postmaster'));
+    return filtered[0] || null;
+}
+
+function threadKeyFromMessage(inReplyTo, messageId, subject) {
+    const base = inReplyTo || messageId || normalizeSubject(subject);
+    return String(base || subject || 'unknown').replace(/^<|>$/g, '').slice(0, 200);
+}
 
 let syncTimer = null;
 let syncing = false;
@@ -97,6 +125,8 @@ async function syncSenderAccount(account) {
                 const receivedAt = msg.envelope?.date || new Date();
 
                 const campaignId = await findCampaignForReply(account.user, inReplyTo, subject);
+                const isBounce = detectBounce(from, subject, bodyText);
+                const threadKey = threadKeyFromMessage(inReplyTo, messageId, subject);
 
                 await InboxMessage.create({
                     user: account.user,
@@ -111,8 +141,19 @@ async function syncSenderAccount(account) {
                     bodyPreview: bodyText.slice(0, 500),
                     body: bodyText,
                     isRead: false,
+                    isBounce,
+                    threadKey,
                     receivedAt,
                 });
+
+                if (isBounce) {
+                    const bounced = extractBouncedEmail(bodyText, subject);
+                    if (bounced) {
+                        try {
+                            await addSuppression(account.user, bounced, 'bounce', `Inbox bounce: ${subject}`.slice(0, 200));
+                        } catch (_) {}
+                    }
+                }
                 synced++;
             }
         } finally {

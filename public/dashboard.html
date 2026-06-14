@@ -248,21 +248,57 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/engine-ui.js"></script>
     <script src="/js/sidebar.js"></script>
+    <script src="/js/persistence-banner.js"></script>
     <script src="/js/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const [statsRes, overviewRes] = await Promise.all([
-                    axios.get('/api/history/stats'),
-                    axios.get('/api/dashboard/overview'),
-                ]);
-                const { total, valid, invalid, unknown } = statsRes.data;
-                const ov = overviewRes.data;
+            let total = 0, valid = 0, invalid = 0, unknown = 0;
 
-                document.getElementById('statTotal').innerText   = total;
-                document.getElementById('statValid').innerText   = valid;
+            try {
+                const statsRes = await axios.get('/api/history/stats');
+                ({ total, valid, invalid, unknown } = statsRes.data);
+                document.getElementById('statTotal').innerText = total;
+                document.getElementById('statValid').innerText = valid;
                 document.getElementById('statInvalid').innerText = invalid;
                 document.getElementById('statUnknown').innerText = unknown;
+
+                const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                const ctx = document.getElementById('statsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Valid', 'Invalid / Bad', 'Unknown'],
+                        datasets: [{
+                            data: [valid, invalid, unknown],
+                            backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
+                            borderWidth: 3,
+                            borderColor: isDark ? '#1e1e1e' : '#fff',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: isDark ? '#f0f0f0' : '#333',
+                                    padding: 20,
+                                    font: { family: 'Inter', weight: '600' }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                showToast('Failed to load stats', 'error');
+                return;
+            }
+
+            try {
+                const overviewRes = await axios.get('/api/dashboard/overview');
+                const ov = overviewRes.data;
 
                 document.getElementById('cmdUnread').textContent = ov.inbox?.unread ?? 0;
                 document.getElementById('cmdRunning').textContent = ov.campaigns?.running ?? 0;
@@ -300,38 +336,8 @@
                         <td><span class="badge ${s.enabled ? 'bg-success' : 'bg-secondary'}">${s.enabled ? 'Active' : 'Disabled'}</span></td>
                     </tr>`).join('')}</tbody></table></div>`;
                 }
-
-                const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-                const ctx = document.getElementById('statsChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Valid', 'Invalid / Bad', 'Unknown'],
-                        datasets: [{
-                            data: [valid, invalid, unknown],
-                            backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
-                            borderWidth: 3,
-                            borderColor: isDark ? '#1e1e1e' : '#fff',
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '70%',
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    color: isDark ? '#f0f0f0' : '#333',
-                                    padding: 20,
-                                    font: { family: 'Inter', weight: '600' }
-                                }
-                            }
-                        }
-                    }
-                });
-            } catch (err) {
-                showToast('Failed to load stats', 'error');
+            } catch (_) {
+                /* overview optional — stats chart already loaded */
             }
         });
     </script>

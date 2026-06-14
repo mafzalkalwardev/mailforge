@@ -3,6 +3,24 @@ const SenderAccount = require('../models/SenderAccount');
 const { renderCampaignEmail } = require('./templateRenderer');
 const { sendWarmUp, sendCampaignMessage } = require('./smtpClient');
 const { isSuppressed, addSuppression, looksLikeBounce } = require('./suppressionService');
+const { getSettingsForUser } = require('./settingsService');
+
+const hourlySendCounts = new Map();
+const senderFailureCounts = new Map();
+
+function hourKey(userId) {
+    const d = new Date();
+    return `${userId}:${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+}
+
+function trackHourlySend(userId) {
+    const key = hourKey(userId);
+    hourlySendCounts.set(key, (hourlySendCounts.get(key) || 0) + 1);
+}
+
+function getHourlySendCount(userId) {
+    return hourlySendCounts.get(hourKey(userId)) || 0;
+}
 
 const activeWorkers = new Map();
 
@@ -61,6 +79,10 @@ async function runCampaignWorker(campaignId) {
             return;
         }
 
+        const userSettings = await getSettingsForUser(campaign.user);
+        const maxPerHour = userSettings.maxSendsPerHour || 0;
+        const failurePausePct = userSettings.senderFailurePausePercent || 25;
+
         const pending = campaign.recipients.filter(r => r.status === 'pending');
         const chunks = splitRecipientsEvenly(pending, senders.length);
         const senderCounts = new Map(senders.map(s => [String(s._id), 0]));
@@ -100,6 +122,18 @@ async function runCampaignWorker(campaignId) {
                     continue;
                 }
 
+                if (maxPerHour > 0 && getHourlySendCount(String(campaign.user)) >= maxPerHour) {
+                    recipient.status = 'skipped';
+                    recipient.error = 'Hourly send limit reached';
+                    recomputeStats(campaign);
+                    await campaign.save();
+                    campaign.status = 'paused';
+                    campaign.lastError = `Paused: hourly limit of ${maxPerHour} sends reached`;
+                    await campaign.save();
+                    abort.cancelled = true;
+                    break;
+                }
+
                 if ((senderCounts.get(String(sender._id)) || 0) >= maxPerSender) {
                     recipient.status = 'skipped';
                     recipient.error = 'Sender daily limit reached';
@@ -111,6 +145,8 @@ async function runCampaignWorker(campaignId) {
                 const row = { Email: recipient.email, ...(recipient.rowData || {}) };
                 const { subject, body } = renderCampaignEmail(campaign, row, sender, {
                     userId: campaign.user,
+                    appendCanSpamFooter: userSettings.appendCanSpamFooter,
+                    canSpamAddress: userSettings.canSpamAddress,
                 });
 
                 let success = false;
@@ -126,6 +162,7 @@ async function runCampaignWorker(campaignId) {
                         recipient.error = '';
                         success = true;
                         senderCounts.set(String(sender._id), (senderCounts.get(String(sender._id)) || 0) + 1);
+                        trackHourlySend(String(campaign.user));
                         break;
                     } catch (err) {
                         lastError = err.message;
@@ -136,6 +173,17 @@ async function runCampaignWorker(campaignId) {
                 if (!success) {
                     recipient.status = 'failed';
                     recipient.error = lastError || 'Send failed';
+                    const sk = `${campaign.user}:${sender.email}`;
+                    const fails = (senderFailureCounts.get(sk) || 0) + 1;
+                    senderFailureCounts.set(sk, fails);
+                    const sentBySender = senderCounts.get(String(sender._id)) || 0;
+                    const failRate = sentBySender + fails > 0 ? (fails / (sentBySender + fails)) * 100 : 100;
+                    if (failRate >= failurePausePct && fails >= 3) {
+                        campaign.lastError = `Paused: ${sender.email} failure rate ${Math.round(failRate)}%`;
+                        campaign.status = 'paused';
+                        await campaign.save();
+                        abort.cancelled = true;
+                    }
                     if (looksLikeBounce(lastError)) {
                         try {
                             await addSuppression(campaign.user, recipient.email, 'bounce', lastError.slice(0, 200));

@@ -55,11 +55,20 @@ function appendUnsubscribeFooter(body, userId, recipientEmail, baseUrl) {
     return `${body}\n\n---\nTo stop receiving emails, unsubscribe here:\n${url}`;
 }
 
+function appendCanSpamFooter(body, address, companyName) {
+    if (!address) return body;
+    const line = companyName ? `${companyName} — ${address}` : address;
+    return `${body}\n\n---\n${line}\nYou received this because we believe it may interest you. Reply STOP to opt out.`;
+}
+
 function renderCampaignEmail(campaign, row, sender, options = {}) {
     const ctx = buildContext(row, sender, campaign);
     const subjectTpl = pickRandom(campaign.subjectTemplates) || campaign.subjectTemplate || 'Hello';
     const bodyTpl = pickRandom(campaign.bodyTemplates) || campaign.bodyTemplate || 'Hi {Name},\n\n';
     let body = renderTemplate(bodyTpl, ctx);
+    if (options.appendCanSpamFooter && options.canSpamAddress) {
+        body = appendCanSpamFooter(body, options.canSpamAddress, campaign.companyName);
+    }
     if (campaign.settings?.appendUnsubscribe !== false && options.userId && row?.Email) {
         const baseUrl = options.baseUrl || process.env.APP_BASE_URL || 'http://localhost:5000';
         body = appendUnsubscribeFooter(body, options.userId, row.Email, baseUrl);
@@ -70,4 +79,4 @@ function renderCampaignEmail(campaign, row, sender, options = {}) {
     };
 }
 
-module.exports = { renderTemplate, buildContext, renderCampaignEmail, pickRandom, appendUnsubscribeFooter };
+module.exports = { renderTemplate, buildContext, renderCampaignEmail, pickRandom, appendUnsubscribeFooter, appendCanSpamFooter };

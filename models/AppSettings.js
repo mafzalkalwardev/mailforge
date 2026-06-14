@@ -69,6 +69,11 @@ const AppSettingsSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+        canSpamAddress: { type: String, default: '', trim: true },
+        appendCanSpamFooter: { type: Boolean, default: false },
+        maxSendsPerHour: { type: Number, min: 0, max: 5000, default: 0 },
+        senderFailurePausePercent: { type: Number, min: 0, max: 100, default: 25 },
+        savePartialOnPause: { type: Boolean, default: true },
     },
     { timestamps: true }
 );

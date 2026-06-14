@@ -3,7 +3,7 @@ const Campaign = require('../models/Campaign');
 const EmailTemplate = require('../models/EmailTemplate');
 const SenderAccount = require('../models/SenderAccount');
 const InboxMessage = require('../models/InboxMessage');
-const { isSuppressed } = require('../utils/suppressionService');
+const { isSuppressed, addSuppression } = require('../utils/suppressionService');
 const { startCampaign, pauseCampaign, isCampaignRunning, recomputeStats } = require('../utils/campaignWorker');
 
 function rowToRecipient(row, validOnly, headers) {
@@ -54,6 +54,7 @@ const createFromBulkJob = async (req, res) => {
         templateId,
         senderAccountIds,
         validOnly = true,
+        dedupe = false,
         companyName,
         subjectTemplates,
         bodyTemplates,
@@ -84,10 +85,23 @@ const createFromBulkJob = async (req, res) => {
             return res.status(400).json({ message: 'Add at least one sender account first' });
         }
 
-        const recipients = [];
+        let rowList = [];
         for (const row of job.rows || []) {
             const rec = rowToRecipient(row, validOnly, job.headers);
-            if (!rec) continue;
+            if (rec) rowList.push(rec);
+        }
+        if (dedupe) {
+            const seen = new Set();
+            rowList = rowList.filter(r => {
+                const e = String(r.email).toLowerCase();
+                if (seen.has(e)) return false;
+                seen.add(e);
+                return true;
+            });
+        }
+
+        const recipients = [];
+        for (const rec of rowList) {
             if (await isSuppressed(req.user._id, rec.email)) continue;
             recipients.push(rec);
         }

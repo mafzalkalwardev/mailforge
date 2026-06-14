@@ -2,6 +2,7 @@ const InboxMessage = require('../models/InboxMessage');
 const SenderAccount = require('../models/SenderAccount');
 const { syncAllAccounts, syncSenderAccount } = require('../utils/imapSync');
 const { sendReplyMessage } = require('../utils/smtpClient');
+const { addSuppression } = require('../utils/suppressionService');
 
 function parseEmailAddress(raw) {
     const s = String(raw || '').trim();
@@ -27,7 +28,7 @@ function applyInboxFilter(filter, filterType) {
 
 const listMessages = async (req, res) => {
     try {
-        const { account, campaign, q, filter, limit = 50, offset = 0 } = req.query;
+        const { account, campaign, q, filter, threads, limit = 50, offset = 0 } = req.query;
         const filterQuery = applyInboxFilter(accountFilter(req.user._id, account), filter);
         if (campaign) filterQuery.campaign = campaign;
         if (q) {
@@ -36,6 +37,41 @@ const listMessages = async (req, res) => {
                 { from: { $regex: q, $options: 'i' } },
                 { bodyPreview: { $regex: q, $options: 'i' } },
             ];
+        }
+
+        if (threads === '1') {
+            const pipeline = [
+                { $match: filterQuery },
+                { $sort: { receivedAt: -1 } },
+                {
+                    $group: {
+                        _id: { $ifNull: ['$threadKey', '$messageId'] },
+                        latestId: { $first: '$_id' },
+                        count: { $sum: 1 },
+                        latestAt: { $first: '$receivedAt' },
+                        subject: { $first: '$subject' },
+                        from: { $first: '$from' },
+                        isRead: { $first: '$isRead' },
+                        isStarred: { $first: '$isStarred' },
+                        campaign: { $first: '$campaign' },
+                        senderAccount: { $first: '$senderAccount' },
+                    },
+                },
+                { $sort: { latestAt: -1 } },
+                { $skip: Number(offset) },
+                { $limit: Math.min(Number(limit), 100) },
+            ];
+            const threadsList = await InboxMessage.aggregate(pipeline);
+            const ids = threadsList.map(t => t.latestId);
+            const messages = await InboxMessage.find({ _id: { $in: ids } })
+                .populate('senderAccount', 'email displayName')
+                .populate('campaign', 'name');
+            const countMap = Object.fromEntries(threadsList.map(t => [String(t.latestId), t.count]));
+            return res.json({
+                messages: messages.map(m => ({ ...m.toObject(), threadCount: countMap[String(m._id)] || 1 })),
+                total: threadsList.length,
+                threaded: true,
+            });
         }
 
         const [messages, total] = await Promise.all([
@@ -191,6 +227,27 @@ const replyToMessage = async (req, res) => {
     }
 };
 
+const setLeadTag = async (req, res) => {
+    try {
+        const { tag } = req.body;
+        const allowed = ['none', 'lead', 'not_interested', 'follow_up'];
+        if (!allowed.includes(tag)) return res.status(400).json({ message: 'Invalid tag' });
+        const message = await InboxMessage.findOneAndUpdate(
+            { _id: req.params.id, user: req.user._id },
+            { leadTag: tag },
+            { new: true }
+        );
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+        if (tag === 'not_interested') {
+            const email = parseEmailAddress(message.from);
+            if (email) await addSuppression(req.user._id, email, 'manual', 'Marked not interested in inbox');
+        }
+        res.json(message);
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating lead tag', error: error.message });
+    }
+};
+
 module.exports = {
     listMessages,
     getMessage,
@@ -201,4 +258,5 @@ module.exports = {
     inboxStats,
     listSenderAccounts,
     replyToMessage,
+    setLeadTag,
 };

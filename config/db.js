@@ -44,6 +44,10 @@ function isDbReady() {
     return dbReady && mongoose.connection.readyState === 1;
 }
 
+function isPersistentStorage() {
+    return Boolean(process.env.MONGO_URI);
+}
+
 process.on('SIGINT', async () => {
     await mongoose.disconnect();
     if (mongod) await mongod.stop();
@@ -52,3 +56,4 @@ process.on('SIGINT', async () => {
 
 module.exports = connectDB;
 module.exports.isDbReady = isDbReady;
+module.exports.isPersistentStorage = isPersistentStorage;

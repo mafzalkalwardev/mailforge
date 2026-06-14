@@ -121,6 +121,7 @@
     <script src="/js/engine-ui.js"></script>
     <script src="/js/csv-export.js"></script>
     <script src="/js/sidebar.js"></script>
+    <script src="/js/persistence-banner.js"></script>
     <script src="/js/main.js"></script>
     <script>
         let fullHistory = [];
@@ -201,17 +202,23 @@
                 const stats = job.stats || {};
                 tr.innerHTML = `
                     <td><input type="checkbox" class="form-check-input job-select" data-id="${job._id}" ${checked}></td>
-                    <td class="fw-medium"><i class="fa-solid fa-file-csv me-2 text-primary"></i>${job.fileName}</td>
+                    <td class="fw-medium"><i class="fa-solid fa-file-csv me-2 text-primary"></i>${job.fileName}${job.isPartial ? ' <span class="badge bg-warning text-dark">partial</span>' : ''}</td>
                     <td>${stats.total ?? '—'}</td>
                     <td class="text-success fw-semibold">${stats.valid ?? '—'}</td>
                     <td class="text-danger fw-semibold">${stats.invalid ?? '—'}</td>
-                    <td class="text-muted small">${new Date(job.completedAt).toLocaleString()}</td>
+                    <td class="text-muted small">${new Date(job.completedAt).toLocaleString()}${job.campaignCount ? `<br><span class="badge bg-info text-dark">${job.campaignCount} campaign(s)</span>` : ''}</td>
                     <td>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-primary job-campaign" data-id="${job._id}" title="Create campaign from valid">
+                        <div class="btn-group btn-group-sm flex-wrap">
+                            <button type="button" class="btn btn-outline-primary job-campaign" data-id="${job._id}" title="Create campaign">
                                 <i class="fa-solid fa-paper-plane"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-success job-export-all" data-id="${job._id}" title="Download all results">
+                            <button type="button" class="btn btn-outline-secondary job-hygiene" data-id="${job._id}" title="List hygiene">
+                                <i class="fa-solid fa-heart-pulse"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-warning job-reverify" data-id="${job._id}" title="Re-verify list">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-success job-export-all" data-id="${job._id}" title="Download all">
                                 <i class="fa-solid fa-download"></i>
                             </button>
                             <button type="button" class="btn btn-success job-export-valid" data-id="${job._id}" title="Download valid only">
@@ -245,6 +252,30 @@
 
             tbody.querySelectorAll('.job-export-valid').forEach(btn => {
                 btn.addEventListener('click', () => exportJobs([btn.dataset.id], true));
+            });
+
+            tbody.querySelectorAll('.job-hygiene').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    try {
+                        const res = await axios.get(`/api/history/bulk-jobs/${btn.dataset.id}/hygiene`);
+                        const h = res.data;
+                        showToast(`Hygiene score ${h.score}/100 · ${h.valid} valid · ${h.duplicates} dupes · ${h.ageDays}d old${h.stale ? ' (stale)' : ''}`, 'info');
+                    } catch (e) {
+                        showToast('Hygiene check failed', 'error');
+                    }
+                });
+            });
+
+            tbody.querySelectorAll('.job-reverify').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    try {
+                        const res = await axios.post(`/api/history/bulk-jobs/${btn.dataset.id}/reverify`, { validOnly: true, dedupe: true });
+                        showToast(`Re-verify started (${res.data.total} emails)`, 'success');
+                        setTimeout(() => { window.location.href = '/bulk.html'; }, 1200);
+                    } catch (e) {
+                        showToast(e.response?.data?.message || 'Re-verify failed', 'error');
+                    }
+                });
             });
 
             updateExportButtons();

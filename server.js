@@ -75,6 +75,8 @@ app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/inbox', require('./routes/inboxRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/suppression', require('./routes/suppressionRoutes'));
+app.use('/api/health', require('./routes/healthRoutes'));
+app.use('/api/backup', require('./routes/backupRoutes'));
 
 app.use(errorHandler);
 

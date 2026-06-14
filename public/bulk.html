@@ -142,7 +142,9 @@
     <script src="/js/engine-ui.js"></script>
     <script src="/js/bulk-job.js"></script>
     <script src="/js/csv-export.js"></script>
+    <script src="/js/confirm-modal.js"></script>
     <script src="/js/sidebar.js"></script>
+    <script src="/js/persistence-banner.js"></script>
     <script src="/js/main.js"></script>
     <script>
         let pollTimer = null;
@@ -187,10 +189,11 @@
             const isPaused = job.status === 'paused';
 
             if (isActive) {
-                statusLine.textContent = 'Running on server — you can switch tabs or close this page.';
+                const eta = p.etaSeconds ? ` · ~${Math.max(1, Math.round(p.etaSeconds / 60))} min left` : '';
+                statusLine.textContent = `Running on server — you can switch tabs or close this page.${eta}`;
                 uploadBtn.disabled = true;
             } else if (isPaused) {
-                statusLine.textContent = `Paused at ${p.completed}/${p.total}. Click Resume to continue.`;
+                statusLine.textContent = `Paused at ${p.completed}/${p.total}. Progress saved as campaign list if enabled.${job.bulkJobId ? ' Open Create Campaign to use it.' : ''}`;
                 uploadBtn.disabled = true;
             } else if (job.status === 'completed') {
                 statusLine.textContent = 'Verification complete. Results saved to History.';
@@ -227,9 +230,10 @@
             </tr>`).join('');
 
             const done = job.status === 'completed';
-            exportBtn.classList.toggle('d-none', !done);
-            exportValidBtn.classList.toggle('d-none', !done);
-            createCampaignBtn.classList.toggle('d-none', !done || !job.bulkJobId);
+            const hasSavedList = !!job.bulkJobId;
+            exportBtn.classList.toggle('d-none', !done && !hasSavedList);
+            exportValidBtn.classList.toggle('d-none', !done && !hasSavedList);
+            createCampaignBtn.classList.toggle('d-none', !hasSavedList);
             if (job.bulkJobId) {
                 createCampaignBtn.href = `/campaign-create.html?bulkJobId=${job.bulkJobId}`;
             }
@@ -299,8 +303,16 @@
                         stopPolling();
                         BulkJob.clearActiveJobId();
                         clearRedirectTimer();
+                        if (job.bulkJobId) {
+                            const full = await axios.get(`/api/verify/jobs/${jobId}?full=1`);
+                            allRows = full.data.rows || [];
+                        }
                     } else if (job.status === 'paused') {
                         stopPolling();
+                        if (job.bulkJobId) {
+                            const full = await axios.get(`/api/verify/jobs/${jobId}?full=1`);
+                            allRows = full.data.rows || [];
+                        }
                     }
                 } catch (err) {
                     console.warn('Poll error', err);
@@ -352,33 +364,50 @@
             }
         });
 
-        async function jobAction(path, msg) {
+        async function jobAction(path, msg, body = {}) {
             if (!currentJobId) return;
             try {
-                const res = await axios.post(`/api/verify/jobs/${currentJobId}${path}`);
-                showToast(msg, 'success');
+                const res = await axios.post(`/api/verify/jobs/${currentJobId}${path}`, body);
+                showToast(res.data.message || msg, 'success');
                 updateUI(res.data.job);
                 if (path === '/resume') startPolling(currentJobId);
                 if (path === '/cancel') {
                     stopPolling();
                     BulkJob.clearActiveJobId();
+                    if (res.data.bulkJobId) {
+                        createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
+                        createCampaignBtn.classList.remove('d-none');
+                    }
                 }
-                if (path === '/pause') stopPolling();
+                if (path === '/pause') {
+                    stopPolling();
+                    if (res.data.bulkJobId) {
+                        createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
+                        createCampaignBtn.classList.remove('d-none');
+                    }
+                }
             } catch (e) {
                 showToast(e.response?.data?.message || 'Action failed', 'error');
             }
         }
 
         document.getElementById('cancelJobBtn')?.addEventListener('click', () => {
-            if (!currentJobId || !confirm('Stop verification? Progress so far is kept but the job will not finish.')) return;
-            jobAction('/cancel', 'Verification stopped');
+            if (!currentJobId) return;
+            if (typeof showConfirm === 'function') {
+                showConfirm({
+                    title: 'Stop verification?',
+                    message: 'Save verified emails so far as a campaign list?',
+                    confirmText: 'Stop & save',
+                    confirmClass: 'btn-danger',
+                    onConfirm: () => jobAction('/cancel', 'Stopped', { savePartial: true }),
+                });
+            } else jobAction('/cancel', 'Stopped', { savePartial: true });
         });
         document.getElementById('stopJobBtn')?.addEventListener('click', () => {
-            if (!currentJobId || !confirm('Stop verification?')) return;
-            jobAction('/cancel', 'Verification stopped');
+            document.getElementById('cancelJobBtn')?.click();
         });
-        document.getElementById('pauseJobBtn')?.addEventListener('click', () => jobAction('/pause', 'Verification paused'));
-        document.getElementById('bannerPauseBtn')?.addEventListener('click', () => jobAction('/pause', 'Verification paused'));
+        document.getElementById('pauseJobBtn')?.addEventListener('click', () => jobAction('/pause', 'Paused', { savePartial: true }));
+        document.getElementById('bannerPauseBtn')?.addEventListener('click', () => jobAction('/pause', 'Paused', { savePartial: true }));
         document.getElementById('resumeJobBtn')?.addEventListener('click', () => jobAction('/resume', 'Verification resumed'));
         document.getElementById('bannerResumeBtn')?.addEventListener('click', () => jobAction('/resume', 'Verification resumed'));
         document.getElementById('cancelRedirectBtn')?.addEventListener('click', clearRedirectTimer);

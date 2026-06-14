@@ -16,6 +16,13 @@ const InboxMessageSchema = new mongoose.Schema(
         isRead: { type: Boolean, default: false },
         isStarred: { type: Boolean, default: false },
         isImportant: { type: Boolean, default: false },
+        isBounce: { type: Boolean, default: false },
+        leadTag: {
+            type: String,
+            enum: ['none', 'lead', 'not_interested', 'follow_up'],
+            default: 'none',
+        },
+        threadKey: { type: String, trim: true, index: true },
         receivedAt: { type: Date, required: true },
         syncedAt: { type: Date, default: Date.now },
     },

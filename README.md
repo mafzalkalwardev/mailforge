@@ -76,6 +76,31 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 - **CI pipeline** — Node tests + Go build on every push
 - **Screenshot script** — `node scripts/capture-screenshots.js` for README assets
 
+### List hygiene & persistence (v1.3)
+- **Mongo persistence banner** — warns when running on in-memory dev database (data lost on restart)
+- **Partial verify save** — pause/stop saves progress to History as a partial bulk job
+- **List hygiene score** — duplicates, age, valid ratio from History → heart icon
+- **Re-verify lists** — one-click re-run verification on saved bulk jobs
+- **Dedupe on campaign create** — remove duplicate emails when building a campaign
+- **Export presets** — download all or valid-only CSV from History API
+
+### Inbox CRM (v1.3)
+- **Thread view** — group messages by conversation in unified inbox
+- **Lead tags** — mark replies as Lead, Follow up, or Not interested (auto-suppresses)
+- **Quick reply templates** — one-click reply snippets in inbox
+- **Bounce detection** — IMAP sync flags bounces and adds to suppression list
+
+### Deliverability controls (v1.3)
+- **Hourly send cap** — limit sends per hour across a campaign
+- **Sender auto-pause** — pause sender when failure rate exceeds threshold
+- **CAN-SPAM footer** — optional physical address footer on campaign emails
+- **Save partial on pause** — toggle in Settings for verify job behavior
+
+### DevOps (v1.3)
+- **Health API** — `GET /api/health` reports DB persistence and uptime
+- **Backup export** — `GET /api/backup/export` downloads user data JSON
+- **Bulk job utils tests** — hygiene, dedupe, export covered in CI
+
 ---
 
 ## Verification engine (recommended)
@@ -188,6 +213,12 @@ You can also go **History → plane icon → Create Campaign** at any time.
 | `GET /api/dashboard/overview` | Command center stats + onboarding |
 | `GET /api/suppression` | Suppression list CRUD |
 | `POST /api/suppression/unsubscribe` | Public one-click unsubscribe |
+| `GET /api/history/bulk-jobs/:id/hygiene` | List hygiene score & stats |
+| `GET /api/history/bulk-jobs/:id/export` | Export bulk job CSV (filter=valid) |
+| `POST /api/history/bulk-jobs/:id/reverify` | Re-verify a saved list |
+| `GET /api/health` | App health + Mongo persistence status |
+| `GET /api/backup/export` | Download user data backup JSON |
+| `POST /api/inbox/:id/lead-tag` | Tag inbox reply (lead / follow up / not interested) |
 
 ---
 
@@ -211,7 +242,7 @@ Browser → Node.js + Express (:5000)
 |----------|---------|-------------|
 | `PORT` | `5000` | Web UI port |
 | `JWT_SECRET` | — | Auth signing key |
-| `MONGO_URI` | (in-memory) | MongoDB connection string |
+| `MONGO_URI` | (in-memory) | MongoDB connection string — **set this in production** or data is lost on restart |
 | `VERIFIER_ENGINE` | `auto` | `auto`, `truemail`, or `reacher` |
 | `GO_VERIFIER_URL` | `http://localhost:8082` | truemail-go API |
 | `ENCRYPTION_KEY` | — | Encrypts sender credentials |

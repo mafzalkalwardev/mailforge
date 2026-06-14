@@ -5,6 +5,21 @@ const InboxMessage = require('../models/InboxMessage');
 const SuppressedEmail = require('../models/SuppressedEmail');
 const VerifyJob = require('../models/VerifyJob');
 const ValidationHistory = require('../models/ValidationHistory');
+const { classifyHistoryRecord } = require('../utils/statusUtils');
+
+async function computeHistoryStats(userId) {
+    const history = await ValidationHistory.find({ user: userId });
+    let valid = 0;
+    let invalid = 0;
+    let unknown = 0;
+    history.forEach(record => {
+        const bucket = classifyHistoryRecord(record);
+        if (bucket === 'valid') valid += 1;
+        else if (bucket === 'unknown') unknown += 1;
+        else invalid += 1;
+    });
+    return { total: history.length, valid, invalid, unknown };
+}
 
 const getOverview = async (req, res) => {
     try {
@@ -28,18 +43,8 @@ const getOverview = async (req, res) => {
             SuppressedEmail.countDocuments({ user: userId }),
             VerifyJob.findOne({ user: userId, status: { $in: ['running', 'paused'] } })
                 .sort({ updatedAt: -1 })
-                .select('status progress fileName updatedAt'),
-            ValidationHistory.aggregate([
-                { $match: { user: userId } },
-                {
-                    $group: {
-                        _id: null,
-                        total: { $sum: 1 },
-                        valid: { $sum: { $cond: [{ $eq: ['$valid', true] }, 1, 0] } },
-                        invalid: { $sum: { $cond: [{ $eq: ['$valid', false] }, 1, 0] } },
-                    },
-                },
-            ]),
+                .select('status stats fileName updatedAt'),
+            computeHistoryStats(userId),
         ]);
 
         const runningCampaigns = campaigns.filter(c => c.status === 'running');
@@ -73,7 +78,7 @@ const getOverview = async (req, res) => {
             })
         );
 
-        const stats = historyAgg[0] || { total: 0, valid: 0, invalid: 0 };
+        const stats = historyAgg || { total: 0, valid: 0, invalid: 0, unknown: 0 };
 
         const onboarding = {
             hasSenders: senders.length > 0,
@@ -94,7 +99,7 @@ const getOverview = async (req, res) => {
                 total: stats.total,
                 valid: stats.valid,
                 invalid: stats.invalid,
-                unknown: Math.max(0, stats.total - stats.valid - stats.invalid),
+                unknown: stats.unknown ?? Math.max(0, stats.total - stats.valid - stats.invalid),
             },
             senders: senderHealth,
             campaigns: {

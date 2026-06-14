@@ -45,6 +45,7 @@
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="unread"><i class="fa-solid fa-envelope me-1"></i>Unread</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="starred"><i class="fa-solid fa-star me-1"></i>Starred</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="important"><i class="fa-solid fa-circle-exclamation me-1"></i>Important</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="threadToggleBtn" title="Group by conversation"><i class="fa-solid fa-comments me-1"></i>Threads</button>
                         </div>
                         <input type="search" id="searchInput" class="form-control mb-3" placeholder="Search inbox...">
                         <div id="messageList" style="max-height: 560px; overflow-y: auto;"></div>
@@ -62,12 +63,27 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/sidebar.js"></script>
+    <script src="/js/persistence-banner.js"></script>
     <script src="/js/main.js"></script>
     <script>
         let messages = [];
         let selectedAccount = '';
         let activeFilter = 'all';
+        let threadMode = false;
         let currentMessageId = null;
+
+        const QUICK_REPLIES = [
+            { label: 'Thanks', body: 'Thank you for your reply. We appreciate your time and will follow up shortly.' },
+            { label: 'Follow up', body: 'Just following up on my previous email. Please let me know if you have any questions.' },
+            { label: 'Schedule call', body: 'Would you be available for a quick call this week? Reply with a time that works for you.' },
+        ];
+
+        const LEAD_TAGS = [
+            { id: 'none', label: 'Untagged', cls: 'secondary' },
+            { id: 'lead', label: 'Lead', cls: 'success' },
+            { id: 'follow_up', label: 'Follow up', cls: 'warning' },
+            { id: 'not_interested', label: 'Not interested', cls: 'danger' },
+        ];
 
         function accountLabel(m) {
             const sa = m.senderAccount;
@@ -107,6 +123,7 @@
             const params = { q, limit: 100 };
             if (selectedAccount) params.account = selectedAccount;
             if (activeFilter !== 'all') params.filter = activeFilter;
+            if (threadMode) params.threads = '1';
             const res = await axios.get('/api/inbox', { params });
             messages = res.data.messages;
             const list = document.getElementById('messageList');
@@ -117,10 +134,10 @@
             list.innerHTML = messages.map(m => `<button type="button" class="list-group-item list-group-item-action text-start border-0 rounded mb-1 ${m.isRead ? '' : 'fw-semibold'} msg-item" data-id="${m._id}">
                 <div class="d-flex justify-content-between gap-2 align-items-start">
                     <span class="text-truncate">${m.from || 'Unknown'}${iconRow(m)}</span>
-                    <small class="text-muted flex-shrink-0">${new Date(m.receivedAt).toLocaleDateString()}</small>
+                    <small class="text-muted flex-shrink-0">${new Date(m.receivedAt).toLocaleDateString()}${m.threadCount > 1 ? ` · ${m.threadCount}` : ''}</small>
                 </div>
                 <div class="small text-truncate">${m.subject || '(no subject)'}</div>
-                <div class="d-flex gap-1 flex-wrap">${!selectedAccount ? accountLabel(m) : ''}${m.campaign ? '<span class="badge bg-info text-dark mt-1">Campaign reply</span>' : ''}</div>
+                <div class="d-flex gap-1 flex-wrap">${!selectedAccount ? accountLabel(m) : ''}${m.campaign ? '<span class="badge bg-info text-dark mt-1">Campaign reply</span>' : ''}${m.isBounce ? '<span class="badge bg-danger mt-1">Bounce</span>' : ''}${m.leadTag && m.leadTag !== 'none' ? `<span class="badge bg-primary mt-1">${m.leadTag.replace('_', ' ')}</span>` : ''}</div>
             </button>`).join('');
 
             list.querySelectorAll('.msg-item').forEach(btn => btn.addEventListener('click', () => showMessage(btn.dataset.id)));
@@ -154,10 +171,20 @@
                 </div>
                 <h5>${m.subject || '(no subject)'}</h5>
                 ${m.campaign ? `<p class="small"><span class="badge bg-info text-dark">Reply to campaign: ${m.campaign.name || ''}</span></p>` : ''}
+                ${m.isBounce ? '<p class="small"><span class="badge bg-danger">Bounce detected — sender auto-suppressed</span></p>' : ''}
+                <div class="d-flex flex-wrap gap-1 mb-2" id="leadTagBar">
+                    ${LEAD_TAGS.map(t => {
+                        const active = (m.leadTag || 'none') === t.id;
+                        return `<button type="button" class="btn btn-sm btn-${active ? t.cls : 'outline-' + t.cls} lead-tag-btn" data-tag="${t.id}">${t.label}</button>`;
+                    }).join('')}
+                </div>
                 <hr>
                 <pre class="small mb-3" id="msgBody" style="white-space: pre-wrap; font-family: inherit;">${displayBody(m)}</pre>
                 <div class="border-top pt-3">
                     <h6 class="fw-semibold mb-2"><i class="fa-solid fa-reply me-1"></i> Reply</h6>
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        ${QUICK_REPLIES.map((q, i) => `<button type="button" class="btn btn-sm btn-outline-secondary quick-reply-btn" data-idx="${i}">${q.label}</button>`).join('')}
+                    </div>
                     <textarea id="replyBody" class="form-control mb-2" rows="4" placeholder="Write your reply..."></textarea>
                     <button type="button" class="btn btn-primary btn-sm" id="sendReplyBtn"><i class="fa-solid fa-paper-plane me-1"></i>Send reply</button>
                 </div>`;
@@ -188,9 +215,32 @@
                     btn.disabled = false;
                 }
             });
+            document.querySelectorAll('.quick-reply-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('replyBody').value = QUICK_REPLIES[Number(btn.dataset.idx)].body;
+                });
+            });
+            document.querySelectorAll('.lead-tag-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    try {
+                        await axios.post(`/api/inbox/${id}/lead-tag`, { tag: btn.dataset.tag });
+                        showToast('Lead tag updated', 'success');
+                        showMessage(id);
+                        loadMessages(document.getElementById('searchInput').value);
+                    } catch (e) {
+                        showToast(e.response?.data?.message || 'Tag update failed', 'error');
+                    }
+                });
+            });
             loadMessages(document.getElementById('searchInput').value);
             loadStats();
         }
+
+        document.getElementById('threadToggleBtn').addEventListener('click', async () => {
+            threadMode = !threadMode;
+            document.getElementById('threadToggleBtn').classList.toggle('active', threadMode);
+            await loadMessages(document.getElementById('searchInput').value);
+        });
 
         document.querySelectorAll('.inbox-filter-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
