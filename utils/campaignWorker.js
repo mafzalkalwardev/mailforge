@@ -5,6 +5,7 @@ const { sendWarmUp, sendCampaignMessage } = require('./smtpClient');
 const { isSuppressed, addSuppression, looksLikeBounce } = require('./suppressionService');
 const { getSettingsForUser } = require('./settingsService');
 
+const { canSenderSendToday, recordSenderSend } = require('./warmupService');
 const hourlySendCounts = new Map();
 const senderFailureCounts = new Map();
 
@@ -142,6 +143,15 @@ async function runCampaignWorker(campaignId) {
                     continue;
                 }
 
+                const sendCap = await canSenderSendToday(sender._id);
+                if (!sendCap.ok) {
+                    recipient.status = 'skipped';
+                    recipient.error = sendCap.reason;
+                    recomputeStats(campaign);
+                    await campaign.save();
+                    continue;
+                }
+
                 const row = { Email: recipient.email, ...(recipient.rowData || {}) };
                 const { subject, body } = renderCampaignEmail(campaign, row, sender, {
                     userId: campaign.user,
@@ -163,6 +173,7 @@ async function runCampaignWorker(campaignId) {
                         success = true;
                         senderCounts.set(String(sender._id), (senderCounts.get(String(sender._id)) || 0) + 1);
                         trackHourlySend(String(campaign.user));
+                        await recordSenderSend(sender._id);
                         break;
                     } catch (err) {
                         lastError = err.message;

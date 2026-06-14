@@ -371,19 +371,21 @@
                 showToast(res.data.message || msg, 'success');
                 updateUI(res.data.job);
                 if (path === '/resume') startPolling(currentJobId);
+                if (path === '/pause') {
+                    stopPolling();
+                    if (res.data.bulkJobId) {
+                        createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
+                        createCampaignBtn.classList.remove('d-none');
+                        showToast('Partial list saved to History — open Create Campaign when ready', 'success');
+                    }
+                }
                 if (path === '/cancel') {
                     stopPolling();
                     BulkJob.clearActiveJobId();
                     if (res.data.bulkJobId) {
                         createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
                         createCampaignBtn.classList.remove('d-none');
-                    }
-                }
-                if (path === '/pause') {
-                    stopPolling();
-                    if (res.data.bulkJobId) {
-                        createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
-                        createCampaignBtn.classList.remove('d-none');
+                        showToast('Partial list saved to History', 'success');
                     }
                 }
             } catch (e) {

@@ -29,7 +29,7 @@
         </div>
         <nav class="nav flex-column px-2"></nav>
         <div class="sidebar-footer">
-            <small class="text-muted">Self-hosted · v1.2.0</small>
+            <small class="text-muted">Self-hosted · v1.3.0</small>
         </div>
     </div>
 
@@ -51,10 +51,14 @@
                         <label class="form-label">Email</label>
                         <input type="email" class="form-control" id="profileEmail" disabled>
                     </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="downloadDataBtn">
+                        <i class="fa-solid fa-download me-1"></i>Download my data
+                    </button>
                 </div>
 
                 <div class="glass-card p-4">
                     <h5 class="mb-3 fw-bold"><i class="fa-solid fa-plug me-2 gradient-text"></i>Connection</h5>
+                    <div id="storageStatus" class="alert alert-secondary small py-2 mb-3">Checking database...</div>
                     <ul class="list-unstyled small text-muted mb-0">
                         <li class="mb-2"><strong class="text-body">App:</strong> <a id="publicAppUrl" href="/" target="_blank">Current deployment</a></li>
                         <li class="mb-2"><strong class="text-body">Verifier:</strong> <code id="goApiUrl">Not configured</code></li>
@@ -353,6 +357,25 @@
             }
         }
 
+        async function loadStorageStatus() {
+            const el = document.getElementById('storageStatus');
+            if (!el) return;
+            try {
+                const res = await axios.get('/api/health');
+                const s = res.data?.storage;
+                if (s?.persistent) {
+                    el.className = 'alert alert-success small py-2 mb-3';
+                    el.innerHTML = `<i class="fa-solid fa-database me-1"></i> <strong>Persistent storage</strong> — data is saved in MongoDB (${s.mode}). Compass: <code>mongodb://127.0.0.1:27017/mailforge</code>`;
+                } else {
+                    el.className = 'alert alert-warning small py-2 mb-3';
+                    el.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>In-memory mode</strong> — data is lost on restart. Start Docker Desktop, then run <code>npm run mongo:up</code> and restart the app.`;
+                }
+            } catch {
+                el.className = 'alert alert-secondary small py-2 mb-3';
+                el.textContent = 'Could not check storage status.';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             document.getElementById('profileName').value = user.name || '';
@@ -361,10 +384,25 @@
             document.getElementById('publicAppUrl').textContent = window.location.origin;
             renderCompareTable();
             loadSettings().finally(checkEngineHealth);
+            loadStorageStatus();
         });
 
         document.getElementById('engineSettingsForm').addEventListener('submit', saveSettings);
         document.getElementById('refreshHealthBtn').addEventListener('click', checkEngineHealth);
+
+        document.getElementById('downloadDataBtn')?.addEventListener('click', async () => {
+            try {
+                const res = await axios.get('/api/backup/export');
+                const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `mailforge-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                showToast('Backup downloaded', 'success');
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Backup failed', 'error');
+            }
+        });
 
         document.getElementById('deliverabilitySettingsForm')?.addEventListener('submit', async e => {
             e.preventDefault();

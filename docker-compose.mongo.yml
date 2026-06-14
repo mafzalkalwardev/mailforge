@@ -1,0 +1,22 @@
+# Local persistent MongoDB for MailForge (no Atlas / IP whitelist required)
+# Usage: npm run mongo:up
+# Compass: mongodb://127.0.0.1:27017/mailforge
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: mailforge-mongo
+    restart: unless-stopped
+    volumes:
+      - mailforge_mongo:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mailforge_mongo:

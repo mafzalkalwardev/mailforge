@@ -63,8 +63,8 @@
                     <button type="button" class="btn btn-sm btn-outline-success" id="exportSelectedAllBtn" disabled>
                         <i class="fa-solid fa-download me-1"></i>Download All (CSV)
                     </button>
-                    <button type="button" class="btn btn-sm btn-success" id="exportSelectedValidBtn" disabled>
-                        <i class="fa-solid fa-filter me-1"></i>Download Valid Only
+                    <button type="button" class="btn btn-sm btn-outline-info" id="compareJobsBtn" data-bs-toggle="modal" data-bs-target="#compareModal">
+                        <i class="fa-solid fa-code-compare me-1"></i>Compare lists
                     </button>
                 </div>
             </div>
@@ -112,6 +112,31 @@
                 <button class="btn btn-sm btn-outline-secondary" id="prevBtn">Previous</button>
                 <span class="text-muted small">Page <span id="pageSpan">1</span> of <span id="totalPagesSpan">1</span></span>
                 <button class="btn btn-sm btn-outline-secondary" id="nextBtn">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="compareModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Compare bulk lists</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">List A (older)</label>
+                        <select id="compareJobA" class="form-select"></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">List B (newer)</label>
+                        <select id="compareJobB" class="form-select"></select>
+                    </div>
+                    <div id="compareResult" class="small text-muted">Select two lists and click Compare.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="runCompareBtn">Compare</button>
+                </div>
             </div>
         </div>
     </div>
@@ -280,7 +305,41 @@
 
             updateExportButtons();
             syncSelectAllCheckbox();
+            fillCompareSelects();
         }
+
+        function fillCompareSelects() {
+            const opts = bulkJobs.map(j => `<option value="${j._id}">${j.fileName}</option>`).join('');
+            const a = document.getElementById('compareJobA');
+            const b = document.getElementById('compareJobB');
+            if (!a || !b) return;
+            a.innerHTML = opts;
+            b.innerHTML = opts;
+            if (bulkJobs.length > 1) {
+                b.selectedIndex = 0;
+                a.selectedIndex = 1;
+            }
+        }
+
+        document.getElementById('runCompareBtn')?.addEventListener('click', async () => {
+            const jobA = document.getElementById('compareJobA').value;
+            const jobB = document.getElementById('compareJobB').value;
+            if (!jobA || !jobB || jobA === jobB) return showToast('Pick two different lists', 'error');
+            try {
+                const res = await axios.post('/api/history/bulk-jobs/compare', { jobA, jobB });
+                const d = res.data;
+                document.getElementById('compareResult').innerHTML = `
+                    <p><strong>${d.jobA.fileName}</strong> (${d.jobA.total}) vs <strong>${d.jobB.fileName}</strong> (${d.jobB.total})</p>
+                    <ul class="mb-0">
+                        <li class="text-success"><strong>+${d.added}</strong> new in B</li>
+                        <li class="text-danger"><strong>-${d.removed}</strong> removed from A</li>
+                        <li><strong>${d.common}</strong> in both</li>
+                    </ul>
+                    ${d.addedSample?.length ? `<p class="mt-2 mb-0 text-muted">New sample: ${d.addedSample.slice(0, 5).join(', ')}</p>` : ''}`;
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Compare failed', 'error');
+            }
+        });
 
         document.getElementById('selectAllJobsCheckbox').addEventListener('change', e => {
             selectedJobIds.clear();

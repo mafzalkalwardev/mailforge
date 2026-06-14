@@ -191,6 +191,38 @@ const reverifyBulkJob = async (req, res) => {
     }
 };
 
+const compareBulkJobs = async (req, res) => {
+    try {
+        const { jobA, jobB } = req.body;
+        if (!jobA || !jobB) return res.status(400).json({ message: 'jobA and jobB are required' });
+
+        const [a, b] = await Promise.all([
+            BulkJob.findOne({ _id: jobA, user: req.user._id }),
+            BulkJob.findOne({ _id: jobB, user: req.user._id }),
+        ]);
+        if (!a || !b) return res.status(404).json({ message: 'One or both bulk jobs not found' });
+
+        const emailsA = new Set((a.rows || []).map(r => String(r.email || '').toLowerCase().trim()).filter(Boolean));
+        const emailsB = new Set((b.rows || []).map(r => String(r.email || '').toLowerCase().trim()).filter(Boolean));
+
+        const added = [...emailsB].filter(e => !emailsA.has(e));
+        const removed = [...emailsA].filter(e => !emailsB.has(e));
+        const common = [...emailsA].filter(e => emailsB.has(e));
+
+        res.json({
+            jobA: { id: a._id, fileName: a.fileName, total: emailsA.size },
+            jobB: { id: b._id, fileName: b.fileName, total: emailsB.size },
+            added: added.length,
+            removed: removed.length,
+            common: common.length,
+            addedSample: added.slice(0, 100),
+            removedSample: removed.slice(0, 100),
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Compare failed', error: error.message });
+    }
+};
+
 module.exports = {
     getHistory,
     getStats,
@@ -200,4 +232,5 @@ module.exports = {
     getBulkJobHygiene,
     exportBulkJobCsv,
     reverifyBulkJob,
+    compareBulkJobs,
 };

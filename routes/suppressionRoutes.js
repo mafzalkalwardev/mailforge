@@ -6,6 +6,7 @@ const {
     bulkImportSuppression,
     removeFromSuppression,
     publicUnsubscribe,
+    getSuppressionStats,
 } = require('../controllers/suppressionController');
 
 const router = express.Router();
@@ -13,6 +14,7 @@ const router = express.Router();
 router.post('/unsubscribe', publicUnsubscribe);
 
 router.use(protect);
+router.get('/stats', getSuppressionStats);
 router.get('/', listSuppressed);
 router.post('/', addToSuppression);
 router.post('/import', bulkImportSuppression);

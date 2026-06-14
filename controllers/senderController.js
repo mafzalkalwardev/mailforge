@@ -4,9 +4,13 @@ const { verifySmtp, sendCampaignMessage } = require('../utils/smtpClient');
 const { parseSenderFile } = require('../utils/senderCsvParser');
 const fs = require('fs');
 
+const { getWarmupStatus } = require('../utils/warmupService');
+const { checkDomainAuth } = require('../utils/dnsAuthCheck');
+
 function sanitizeSender(doc) {
     const obj = doc.toObject ? doc.toObject() : { ...doc };
     delete obj.encryptedPassword;
+    obj.warmup = getWarmupStatus(obj);
     return obj;
 }
 
@@ -54,7 +58,7 @@ const updateSender = async (req, res) => {
         const sender = await SenderAccount.findOne({ _id: req.params.id, user: req.user._id });
         if (!sender) return res.status(404).json({ message: 'Sender not found' });
 
-        const { displayName, appPassword, smtpHost, smtpPort, imapHost, imapPort, dailyLimit, enabled } = req.body;
+        const { displayName, appPassword, smtpHost, smtpPort, imapHost, imapPort, dailyLimit, enabled, warmupEnabled } = req.body;
         if (displayName !== undefined) sender.displayName = displayName;
         if (appPassword) sender.encryptedPassword = encrypt(appPassword);
         if (smtpHost) sender.smtpHost = smtpHost;
@@ -63,6 +67,7 @@ const updateSender = async (req, res) => {
         if (imapPort) sender.imapPort = imapPort;
         if (dailyLimit) sender.dailyLimit = dailyLimit;
         if (enabled !== undefined) sender.enabled = enabled;
+        if (warmupEnabled !== undefined) sender.warmupEnabled = warmupEnabled;
 
         await sender.save();
         res.json(sanitizeSender(sender));
@@ -167,6 +172,26 @@ const bulkImportSenders = async (req, res) => {
     }
 };
 
+const checkSenderDns = async (req, res) => {
+    try {
+        const sender = await SenderAccount.findOne({ _id: req.params.id, user: req.user._id });
+        if (!sender) return res.status(404).json({ message: 'Sender not found' });
+        const auth = await checkDomainAuth(sender.email);
+        sender.dnsAuth = {
+            score: auth.score,
+            spfOk: auth.spf?.ok,
+            dmarcOk: auth.dmarc?.ok,
+            dkimOk: auth.dkim?.ok,
+            warnings: auth.warnings || [],
+            checkedAt: new Date(),
+        };
+        await sender.save();
+        res.json({ ...auth, warmup: getWarmupStatus(sender) });
+    } catch (error) {
+        res.status(500).json({ message: 'DNS check failed', error: error.message });
+    }
+};
+
 module.exports = {
     listSenders,
     createSender,
@@ -175,4 +200,5 @@ module.exports = {
     testSender,
     sendTestEmail,
     bulkImportSenders,
+    checkSenderDns,
 };

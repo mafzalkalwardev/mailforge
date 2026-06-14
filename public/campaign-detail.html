@@ -36,6 +36,24 @@
                 <div class="btn-group" id="actionBtns"></div>
             </div>
 
+            <div class="row g-3 mb-4" id="queuePanel">
+                <div class="col-12">
+                    <div class="glass-card p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <h5 class="mb-0"><i class="fa-solid fa-list-check me-2"></i>Send queue</h5>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-warning d-none" id="retryFailedBtn"><i class="fa-solid fa-rotate me-1"></i>Retry failed</button>
+                            </div>
+                        </div>
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="queueProgress" style="width: 0%"></div>
+                        </div>
+                        <p class="small text-muted mb-3" id="queueStatusLine">—</p>
+                        <div id="failedQueue" class="small"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Total</div><div class="fs-4 fw-bold" id="statTotal">0</div></div></div>
                 <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Sent</div><div class="fs-4 fw-bold text-success" id="statSent">0</div></div></div>
@@ -80,6 +98,43 @@
         const campaignId = new URLSearchParams(location.search).get('id');
         if (!campaignId) location.href = '/campaigns.html';
         let repliesChart = null;
+        let pollTimer = null;
+
+        async function loadQueue() {
+            try {
+                const res = await axios.get(`/api/campaigns/${campaignId}/queue`);
+                const q = res.data;
+                const bar = document.getElementById('queueProgress');
+                bar.style.width = `${q.progress || 0}%`;
+                bar.className = `progress-bar ${q.running ? 'progress-bar-striped progress-bar-animated' : ''} bg-${q.status === 'failed' ? 'danger' : 'primary'}`;
+                document.getElementById('queueStatusLine').textContent = q.running
+                    ? `Sending… ${q.progress}% complete (${q.stats?.pending || 0} pending)`
+                    : `${q.status} — ${q.stats?.sent || 0} sent, ${q.stats?.failed || 0} failed${q.lastError ? ` · ${q.lastError}` : ''}`;
+
+                const failedEl = document.getElementById('failedQueue');
+                const failed = q.failed || [];
+                const retryBtn = document.getElementById('retryFailedBtn');
+                if (failed.length) {
+                    retryBtn.classList.remove('d-none');
+                    failedEl.innerHTML = `<p class="fw-semibold text-danger mb-1">Failed (${failed.length}${(q.stats?.failed || 0) > failed.length ? '+' : ''})</p>
+                        <ul class="mb-0 ps-3">${failed.slice(0, 15).map(f => `<li><code>${f.email}</code> <span class="text-muted">${f.error || ''}</span></li>`).join('')}</ul>`;
+                } else {
+                    retryBtn.classList.add('d-none');
+                    failedEl.innerHTML = q.running ? '' : '<p class="text-muted mb-0">No failed sends in queue snapshot.</p>';
+                }
+            } catch (_) {}
+        }
+
+        document.getElementById('retryFailedBtn')?.addEventListener('click', async () => {
+            try {
+                const res = await axios.post(`/api/campaigns/${campaignId}/retry-failed`, {});
+                showToast(res.data.message || 'Retry started', 'success');
+                loadCampaign();
+                loadQueue();
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Retry failed', 'error');
+            }
+        });
 
         function statusClass(status) {
             if (status === 'running') return 'primary';
@@ -159,9 +214,11 @@
             if (['draft', 'paused', 'scheduled'].includes(c.status)) {
                 actions.innerHTML = `<button class="btn btn-success" id="startBtn"><i class="fa-solid fa-play me-1"></i> ${c.status === 'scheduled' ? 'Start now' : 'Start'}</button>`;
                 document.getElementById('startBtn').onclick = async () => {
-                    await axios.post(`/api/campaigns/${campaignId}/start`);
+                    const res = await axios.post(`/api/campaigns/${campaignId}/start`, { skipDnsCheck: false });
+                    if (res.data.dnsWarnings?.length) showToast(`DNS warnings: ${res.data.dnsWarnings[0]}`, 'info');
                     showToast('Started', 'success');
                     loadCampaign();
+                    loadQueue();
                     loadAnalytics();
                 };
             }
@@ -184,11 +241,18 @@
             </tr>`).join('');
 
             loadAnalytics();
+            loadQueue();
+            if (pollTimer) clearInterval(pollTimer);
+            if (c.status === 'running') pollTimer = setInterval(() => { loadCampaign(); loadQueue(); }, 3000);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             loadCampaign();
-            setInterval(loadCampaign, 10000);
+            setInterval(() => {
+                axios.get(`/api/campaigns/${campaignId}`).then(res => {
+                    if (res.data.status === 'running') { loadCampaign(); loadQueue(); }
+                }).catch(() => {});
+            }, 10000);
         });
     </script>
 </body>

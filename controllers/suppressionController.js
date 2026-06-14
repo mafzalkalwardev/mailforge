@@ -4,9 +4,10 @@ const { addSuppression } = require('../utils/suppressionService');
 
 const listSuppressed = async (req, res) => {
     try {
-        const { q, limit = 100, offset = 0 } = req.query;
+        const { q, limit = 100, offset = 0, reason } = req.query;
         const filter = { user: req.user._id };
         if (q) filter.email = { $regex: q, $options: 'i' };
+        if (reason) filter.reason = reason;
 
         const [items, total] = await Promise.all([
             SuppressedEmail.find(filter)
@@ -62,6 +63,23 @@ const removeFromSuppression = async (req, res) => {
     }
 };
 
+const getSuppressionStats = async (req, res) => {
+    try {
+        const rows = await SuppressedEmail.aggregate([
+            { $match: { user: req.user._id } },
+            { $group: { _id: '$reason', count: { $sum: 1 } } },
+        ]);
+        const byReason = Object.fromEntries(rows.map(r => [r._id, r.count]));
+        res.json({
+            total: Object.values(byReason).reduce((a, b) => a + b, 0),
+            byReason,
+            bounces: byReason.bounce || 0,
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching stats', error: error.message });
+    }
+};
+
 const publicUnsubscribe = async (req, res) => {
     try {
         const { token } = req.body;
@@ -80,4 +98,5 @@ module.exports = {
     bulkImportSuppression,
     removeFromSuppression,
     publicUnsubscribe,
+    getSuppressionStats,
 };

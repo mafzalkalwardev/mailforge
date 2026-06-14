@@ -5,6 +5,7 @@ const SenderAccount = require('../models/SenderAccount');
 const InboxMessage = require('../models/InboxMessage');
 const { isSuppressed, addSuppression } = require('../utils/suppressionService');
 const { startCampaign, pauseCampaign, isCampaignRunning, recomputeStats } = require('../utils/campaignWorker');
+const { checkSendersDns } = require('../utils/dnsAuthCheck');
 
 function rowToRecipient(row, validOnly, headers) {
     const email = String(row.email || '').toLowerCase().trim();
@@ -174,7 +175,7 @@ const startCampaignHandler = async (req, res) => {
             return res.status(400).json({ message: 'Campaign is already running' });
         }
 
-        const { scheduledAt } = req.body || {};
+        const { scheduledAt, skipDnsCheck } = req.body || {};
         if (scheduledAt) campaign.scheduledAt = new Date(scheduledAt);
 
         if (campaign.scheduledAt && campaign.scheduledAt > new Date()) {
@@ -192,6 +193,40 @@ const startCampaignHandler = async (req, res) => {
             return res.status(400).json({ message: `Cannot start campaign in status: ${campaign.status}` });
         }
 
+        const senders = await SenderAccount.find({
+            _id: { $in: campaign.senderAccountIds },
+            user: req.user._id,
+            enabled: true,
+        });
+        if (!senders.length) {
+            return res.status(400).json({ message: 'No enabled sender accounts' });
+        }
+
+        let dnsWarnings = [];
+        if (!skipDnsCheck) {
+            const dnsResults = await checkSendersDns(senders);
+            for (let i = 0; i < senders.length; i++) {
+                const r = dnsResults[i];
+                senders[i].dnsAuth = {
+                    score: r.score,
+                    spfOk: r.spf?.ok,
+                    dmarcOk: r.dmarc?.ok,
+                    dkimOk: r.dkim?.ok,
+                    warnings: r.warnings || [],
+                    checkedAt: new Date(),
+                };
+                await senders[i].save();
+            }
+            dnsWarnings = dnsResults.flatMap(r => (r.warnings || []).map(w => `${r.email}: ${w}`));
+            const weak = dnsResults.filter(r => r.score < 2);
+            if (weak.length && req.body?.requireDnsPass) {
+                return res.status(400).json({
+                    message: 'DNS authentication check failed for one or more senders',
+                    dnsResults: weak,
+                });
+            }
+        }
+
         campaign.status = 'running';
         campaign.startedAt = campaign.startedAt || new Date();
         campaign.lastError = '';
@@ -199,7 +234,12 @@ const startCampaignHandler = async (req, res) => {
         await campaign.save();
 
         startCampaign(campaign._id);
-        res.json({ message: 'Campaign started', id: campaign._id, status: 'running' });
+        res.json({
+            message: 'Campaign started',
+            id: campaign._id,
+            status: 'running',
+            dnsWarnings,
+        });
     } catch (error) {
         res.status(500).json({ message: 'Error starting campaign', error: error.message });
     }
@@ -280,6 +320,78 @@ const getCampaignAnalytics = async (req, res) => {
     }
 };
 
+const getCampaignQueue = async (req, res) => {
+    try {
+        const campaign = await Campaign.findOne({ _id: req.params.id, user: req.user._id });
+        if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
+
+        const stats = campaign.stats || {};
+        const total = stats.total || 0;
+        const done = (stats.sent || 0) + (stats.failed || 0) + (stats.skipped || 0);
+        const progress = total > 0 ? Math.round((done / total) * 1000) / 10 : 0;
+
+        const failed = (campaign.recipients || [])
+            .filter(r => r.status === 'failed')
+            .slice(0, 100)
+            .map(r => ({ id: r._id, email: r.email, error: r.error, senderEmail: r.senderEmail }));
+
+        const recent = (campaign.recipients || [])
+            .filter(r => r.sentAt)
+            .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt))
+            .slice(0, 20)
+            .map(r => ({ email: r.email, status: r.status, sentAt: r.sentAt, senderEmail: r.senderEmail }));
+
+        res.json({
+            status: campaign.status,
+            running: isCampaignRunning(campaign._id),
+            progress,
+            stats,
+            lastError: campaign.lastError || '',
+            failed,
+            recent,
+            startedAt: campaign.startedAt,
+            completedAt: campaign.completedAt,
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching queue', error: error.message });
+    }
+};
+
+const retryFailedRecipients = async (req, res) => {
+    try {
+        const campaign = await Campaign.findOne({ _id: req.params.id, user: req.user._id });
+        if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
+        if (isCampaignRunning(campaign._id)) {
+            return res.status(400).json({ message: 'Campaign is still running' });
+        }
+
+        const ids = Array.isArray(req.body?.recipientIds) ? req.body.recipientIds.map(String) : null;
+        let retried = 0;
+
+        for (const r of campaign.recipients || []) {
+            if (r.status !== 'failed') continue;
+            if (ids && !ids.includes(String(r._id))) continue;
+            r.status = 'pending';
+            r.error = '';
+            retried += 1;
+        }
+
+        if (!retried) {
+            return res.status(400).json({ message: 'No failed recipients to retry' });
+        }
+
+        recomputeStats(campaign);
+        campaign.status = 'running';
+        campaign.lastError = '';
+        await campaign.save();
+        startCampaign(campaign._id);
+
+        res.json({ message: `Retrying ${retried} failed recipient(s)`, retried, status: 'running' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error retrying failed sends', error: error.message });
+    }
+};
+
 const deleteCampaign = async (req, res) => {
     try {
         const campaign = await Campaign.findOne({ _id: req.params.id, user: req.user._id });
@@ -303,4 +415,6 @@ module.exports = {
     pauseCampaignHandler,
     deleteCampaign,
     getCampaignAnalytics,
+    getCampaignQueue,
+    retryFailedRecipients,
 };

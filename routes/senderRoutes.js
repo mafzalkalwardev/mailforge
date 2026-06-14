@@ -10,6 +10,7 @@ const {
     testSender,
     sendTestEmail,
     bulkImportSenders,
+    checkSenderDns,
 } = require('../controllers/senderController');
 
 const router = express.Router();
@@ -21,6 +22,7 @@ router.get('/', listSenders);
 router.post('/import', upload.single('file'), bulkImportSenders);
 router.post('/', createSender);
 router.post('/:id/test', testSender);
+router.post('/:id/check-dns', checkSenderDns);
 router.post('/:id/send-test', sendTestEmail);
 router.put('/:id', updateSender);
 router.delete('/:id', deleteSender);

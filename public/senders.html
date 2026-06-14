@@ -125,22 +125,38 @@
                     el.innerHTML = '<p class="text-muted mb-0">No sender accounts yet. Add one or bulk import a CSV.</p>';
                     return;
                 }
-                el.innerHTML = `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Account</th><th>Limit</th><th>Status</th><th></th></tr></thead><tbody>${res.data.map(s => `<tr>
-                    <td><strong>${s.displayName || s.email}</strong><br><small class="text-muted">${s.email}</small></td>
-                    <td>${s.dailyLimit}/day</td>
+                el.innerHTML = `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Account</th><th>Warm-up</th><th>DNS</th><th>Status</th><th></th></tr></thead><tbody>${res.data.map(s => {
+                    const w = s.warmup || {};
+                    const dns = s.dnsAuth || {};
+                    const dnsBadge = dns.checkedAt
+                        ? `<span class="badge ${dns.score >= 2 ? 'bg-success' : 'bg-warning text-dark'}">${dns.score || 0}/3</span>`
+                        : '<span class="badge bg-secondary">?</span>';
+                    return `<tr>
+                    <td><strong>${s.displayName || s.email}</strong><br><small class="text-muted">${s.email}</small><br><small class="text-muted">Day ${w.day || 1}: ${w.sentToday || 0}/${w.limitToday || s.dailyLimit} today</small></td>
+                    <td>${w.enabled ? `<span class="badge bg-info text-dark">Day ${w.day}</span>` : '<span class="badge bg-secondary">Off</span>'}</td>
+                    <td>${dnsBadge}</td>
                     <td><span class="badge ${s.enabled ? 'bg-success' : 'bg-secondary'}">${s.enabled ? 'Enabled' : 'Disabled'}</span></td>
                     <td><div class="btn-group btn-group-sm flex-wrap">
-                        <button class="btn btn-outline-primary test-btn" data-id="${s._id}">Test SMTP</button>
-                        <button class="btn btn-outline-success send-test-btn" data-id="${s._id}">Send Test</button>
+                        <button class="btn btn-outline-primary test-btn" data-id="${s._id}">SMTP</button>
+                        <button class="btn btn-outline-secondary dns-btn" data-id="${s._id}">DNS</button>
+                        <button class="btn btn-outline-success send-test-btn" data-id="${s._id}">Test send</button>
                         <button class="btn btn-outline-danger del-btn" data-id="${s._id}">Delete</button>
                     </div></td>
-                </tr>`).join('')}</tbody></table></div>`;
+                </tr>`;}).join('')}</tbody></table></div>`;
 
                 el.querySelectorAll('.test-btn').forEach(btn => btn.addEventListener('click', async () => {
                     try {
                         await axios.post(`/api/senders/${btn.dataset.id}/test`);
                         showToast('SMTP connection OK', 'success');
                     } catch (e) { showToast(e.response?.data?.message || 'Test failed', 'error'); }
+                }));
+                el.querySelectorAll('.dns-btn').forEach(btn => btn.addEventListener('click', async () => {
+                    try {
+                        const res = await axios.post(`/api/senders/${btn.dataset.id}/check-dns`);
+                        const w = (res.data.warnings || []).join('; ') || 'DNS looks OK';
+                        showToast(`SPF/DKIM/DMARC score ${res.data.score}/3 — ${w}`, res.data.score >= 2 ? 'success' : 'info');
+                        loadSenders();
+                    } catch (e) { showToast(e.response?.data?.message || 'DNS check failed', 'error'); }
                 }));
                 el.querySelectorAll('.send-test-btn').forEach(btn => btn.addEventListener('click', () => {
                     document.getElementById('testSenderId').value = btn.dataset.id;

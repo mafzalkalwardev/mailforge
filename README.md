@@ -157,6 +157,22 @@ This starts **MongoDB** and the **MailForge app** on port 5000. Run truemail-go 
 docker compose -f docker-compose.full.yml --profile reacher up -d
 ```
 
+### Persistent data on Windows (recommended — no Atlas IP whitelist)
+
+Atlas blocks connections unless your IP is whitelisted. For local dev, use **Docker MongoDB** on your PC — data survives restarts and Compass works at `mongodb://127.0.0.1:27017/mailforge`.
+
+```powershell
+npm run mongo:up          # start MongoDB container (once)
+npm start               # start MailForge
+
+# Or both in one step:
+npm run start:persistent
+```
+
+MongoDB Compass: connect with **`mongodb://127.0.0.1:27017`** → database **`mailforge`**.
+
+Optional Atlas cloud backup: uncomment `MONGO_URI` in `.env` only when Network Access allows your IP.
+
 One-command start (Node + Go verifier on Windows):
 
 ```powershell
@@ -242,7 +258,7 @@ Browser → Node.js + Express (:5000)
 |----------|---------|-------------|
 | `PORT` | `5000` | Web UI port |
 | `JWT_SECRET` | — | Auth signing key |
-| `MONGO_URI` | (in-memory) | MongoDB connection string — **set this in production** or data is lost on restart |
+| `MONGO_URI` | `mongodb://127.0.0.1:27017/mailforge` | Local Docker MongoDB (run `npm run mongo:up`). Atlas optional if IP is whitelisted |
 | `VERIFIER_ENGINE` | `auto` | `auto`, `truemail`, or `reacher` |
 | `GO_VERIFIER_URL` | `http://localhost:8082` | truemail-go API |
 | `ENCRYPTION_KEY` | — | Encrypts sender credentials |

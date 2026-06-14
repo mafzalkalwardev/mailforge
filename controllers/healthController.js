@@ -1,4 +1,4 @@
-const { isPersistentStorage, isDbReady } = require('../config/db');
+const { isPersistentStorage, isDbReady, getStorageMode } = require('../config/db');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
@@ -23,8 +23,10 @@ const getHealth = async (req, res) => {
         version: require('../package.json').version,
         storage: {
             persistent: isPersistentStorage(),
-            mode: isPersistentStorage() ? 'mongodb' : 'in-memory',
-            warning: isPersistentStorage() ? null : 'Data is lost when the server stops. Set MONGO_URI in .env.',
+            mode: getStorageMode(),
+            warning: isPersistentStorage()
+                ? null
+                : 'Data is lost when the server stops. Run: npm run mongo:up',
         },
         database: {
             connected: isDbReady(),

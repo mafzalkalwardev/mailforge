@@ -36,6 +36,13 @@
             </div>
 
             <div class="glass-card p-4 mb-4">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary reason-filter active" data-reason="">All</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger reason-filter" data-reason="bounce">Bounces</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning reason-filter" data-reason="unsubscribe">Unsubscribes</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary reason-filter" data-reason="manual">Manual</button>
+                </div>
+                <p id="bounceStats" class="small text-muted mb-3"></p>
                 <div class="row g-3 align-items-end">
                     <div class="col-md-6">
                         <label class="form-label">Search</label>
@@ -102,11 +109,22 @@
             complaint: 'bg-dark',
             import: 'bg-info text-dark',
         };
+        let activeReason = '';
+
+        async function loadStats() {
+            try {
+                const res = await axios.get('/api/suppression/stats');
+                document.getElementById('bounceStats').textContent =
+                    `${res.data.total} suppressed · ${res.data.bounces} bounces · ${res.data.byReason?.unsubscribe || 0} unsubscribes`;
+            } catch (_) {}
+        }
 
         async function loadList(q = '') {
             const el = document.getElementById('listContainer');
             try {
-                const res = await axios.get('/api/suppression', { params: { q, limit: 200 } });
+                const params = { q, limit: 200 };
+                if (activeReason) params.reason = activeReason;
+                const res = await axios.get('/api/suppression', { params });
                 const items = res.data.items || [];
                 if (!items.length) {
                     el.innerHTML = '<p class="text-muted mb-0">No suppressed emails. Bounces and unsubscribes are added automatically.</p>';
@@ -168,13 +186,22 @@
             }
         });
 
+        document.querySelectorAll('.reason-filter').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.reason-filter').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeReason = btn.dataset.reason || '';
+                loadList(document.getElementById('searchInput').value);
+            });
+        });
+
         let timer;
         document.getElementById('searchInput').addEventListener('input', e => {
             clearTimeout(timer);
             timer = setTimeout(() => loadList(e.target.value), 300);
         });
 
-        document.addEventListener('DOMContentLoaded', () => loadList());
+        document.addEventListener('DOMContentLoaded', () => { loadStats(); loadList(); });
     </script>
 </body>
 </html>
