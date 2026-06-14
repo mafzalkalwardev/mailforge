@@ -91,7 +91,7 @@ async function saveSettingsForUser(userId, input) {
     const saved = await AppSettings.findOneAndUpdate(
         { user: userId },
         { $set: settings },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+        { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     ).lean();
 
     return sanitizeSettings(saved);

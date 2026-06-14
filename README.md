@@ -12,8 +12,14 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 [![Go](https://img.shields.io/badge/Go-1.22-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
 [![Docker](https://img.shields.io/badge/Reacher-Optional-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![Setup guide](https://img.shields.io/badge/Setup-SETUP.md-blue?style=for-the-badge)](SETUP.md)
+[![Contributing](https://img.shields.io/badge/Contributing-welcome-green?style=for-the-badge)](CONTRIBUTING.md)
 
 </div>
+
+---
+
+> **New PC?** Follow **[SETUP.md](SETUP.md)** for a full install checklist, or run `npm run setup:new-pc` after cloning.
 
 ---
 
@@ -129,6 +135,8 @@ docker compose up -d
 
 ## Quick start (Windows)
 
+> Full guide: **[SETUP.md](SETUP.md)** | New machine: `npm run setup:new-pc`
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
@@ -161,12 +169,18 @@ docker compose -f docker-compose.full.yml --profile reacher up -d
 
 Atlas blocks connections unless your IP is whitelisted. For local dev, use **Docker MongoDB** on your PC — data survives restarts and Compass works at `mongodb://127.0.0.1:27017/mailforge`.
 
-```powershell
-npm run mongo:up          # start MongoDB container (once)
-npm start               # start MailForge
+**Easiest start (pick one):**
 
-# Or both in one step:
-npm run start:persistent
+| Method | How |
+|--------|-----|
+| **MailForge.exe** | Double-click `MailForge.exe` in the project folder (build with `npm run build:exe`) |
+| **Batch file** | Double-click `Start-MailForge.bat` |
+| **npm** | `npm run start:easy` |
+
+```powershell
+npm run mongo:up          # MongoDB only (if app already running)
+npm start                 # app only
+npm run build:exe         # rebuild MailForge.exe launcher
 ```
 
 MongoDB Compass: connect with **`mongodb://127.0.0.1:27017`** → database **`mailforge`**.
@@ -277,11 +291,33 @@ Per-user overrides (verifier URLs, OpenAI key, auto-redirect after verify) are a
 
 **https://github.com/mafzalkalwardev/mailforge**
 
+| Resource | Link |
+|----------|------|
+| **Clone** | `git clone https://github.com/mafzalkalwardev/mailforge.git` |
+| **New PC setup** | [SETUP.md](SETUP.md) |
+| **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| **Security** | [SECURITY.md](SECURITY.md) |
+| **Report bugs** | [Issues](https://github.com/mafzalkalwardev/mailforge/issues) |
+| **Pull requests** | [Contributing guide](CONTRIBUTING.md) |
+
 | Field | Value |
 |-------|-------|
 | **Repository name** | `mailforge` |
 | **Description** | Self-hosted email operations platform — verify lists with live SMTP proof, run multi-sender campaigns, and manage every reply from one unified inbox. Free, private, no SaaS APIs. |
-| **Topics** | `email-verification`, `smtp`, `email-marketing`, `self-hosted`, `nodejs`, `campaigns`, `inbox` |
+| **Topics** | `email-verification`, `smtp`, `email-marketing`, `self-hosted`, `nodejs`, `campaigns`, `inbox`, `mongodb`, `docker`, `open-source` |
+
+---
+
+## Contributing
+
+We welcome contributions! See **[CONTRIBUTING.md](CONTRIBUTING.md)** for:
+
+- Fork and PR workflow
+- Development setup
+- Issue and PR templates
+- Code guidelines
+
+Good first contributions: docs, tests, bug fixes, UI polish.
 
 ---
 

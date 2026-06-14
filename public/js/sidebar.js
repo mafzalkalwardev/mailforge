@@ -1,6 +1,6 @@
 (function () {
     const BRAND = 'MailForge';
-    const APP_VERSION = '1.4.0';
+    const APP_VERSION = '1.4.1';
     const NAV_ITEMS = [
         { href: '/dashboard.html', icon: 'fa-chart-pie', label: 'Dashboard' },
         { href: '/single.html', icon: 'fa-magnifying-glass', label: 'Single Verify' },

@@ -101,4 +101,19 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
+process.on('unhandledRejection', (reason) => {
+    const msg = reason?.message || String(reason);
+    console.warn('Unhandled rejection (server continues):', msg);
+});
+
+process.on('uncaughtException', (err) => {
+    const msg = err?.message || '';
+    if (err?.code === 'ETIMEOUT' || msg.includes('Socket timeout') || msg.includes('IMAP')) {
+        console.warn('Background IMAP error (server continues):', msg);
+        return;
+    }
+    console.error('Fatal uncaught exception:', err);
+    process.exit(1);
+});
+
 module.exports = app;

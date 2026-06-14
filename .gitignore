@@ -1,5 +1,7 @@
 # Dependencies
+node_modules/
 backups/
+MailForge.exe
 
 # Secrets & local config
 .env

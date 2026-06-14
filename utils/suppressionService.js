@@ -13,7 +13,7 @@ async function addSuppression(userId, email, reason = 'manual', note = '') {
     return SuppressedEmail.findOneAndUpdate(
         { user: userId, email: normalized },
         { reason, note },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 }
 

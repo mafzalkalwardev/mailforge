@@ -59,6 +59,58 @@ function extractHeader(source, name) {
     return m ? m[1].trim() : '';
 }
 
+function createImapClient(account) {
+    const password = decrypt(account.encryptedPassword);
+    const client = new ImapFlow({
+        host: account.imapHost || 'imap.gmail.com',
+        port: account.imapPort || 993,
+        secure: true,
+        auth: {
+            user: account.email,
+            pass: password,
+        },
+        logger: false,
+        socketTimeout: 120000,
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        maxIdleTime: 60000,
+    });
+
+    client.on('error', (err) => {
+        console.warn(`IMAP client error for ${account.email}:`, err.message);
+    });
+
+    return client;
+}
+
+async function safeCloseClient(client) {
+    if (!client) return;
+    try {
+        await Promise.race([
+            (async () => {
+                try {
+                    if (client.authenticated) {
+                        await client.logout();
+                    } else {
+                        await client.close();
+                    }
+                } catch {
+                    await client.close();
+                }
+            })(),
+            new Promise(resolve => setTimeout(resolve, 4000)),
+        ]);
+    } catch (_) {
+        // ignore
+    }
+    try {
+        client.removeAllListeners('error');
+        await client.close();
+    } catch (_) {
+        // ignore
+    }
+}
+
 async function findCampaignForReply(userId, inReplyTo, subject) {
     const cleanId = String(inReplyTo || '').replace(/^<|>$/g, '').trim();
     if (cleanId) {
@@ -84,21 +136,11 @@ async function findCampaignForReply(userId, inReplyTo, subject) {
 }
 
 async function syncSenderAccount(account) {
-    const password = decrypt(account.encryptedPassword);
-    const client = new ImapFlow({
-        host: account.imapHost || 'imap.gmail.com',
-        port: account.imapPort || 993,
-        secure: true,
-        auth: {
-            user: account.email,
-            pass: password,
-        },
-        logger: false,
-    });
-
+    const client = createImapClient(account);
     let synced = 0;
-    await client.connect();
+
     try {
+        await client.connect();
         const lock = await client.getMailboxLock('INBOX');
         try {
             const since = account.lastSyncAt || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -159,13 +201,18 @@ async function syncSenderAccount(account) {
         } finally {
             lock.release();
         }
+
+        account.lastSyncAt = new Date();
+        await account.save();
     } finally {
-        await client.logout();
+        await safeCloseClient(client);
     }
 
-    account.lastSyncAt = new Date();
-    await account.save();
     return synced;
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function syncAllAccounts() {
@@ -180,6 +227,7 @@ async function syncAllAccounts() {
             } catch (err) {
                 console.warn(`Inbox sync failed for ${account.email}:`, err.message);
             }
+            await sleep(1500);
         }
     } finally {
         syncing = false;
@@ -188,8 +236,12 @@ async function syncAllAccounts() {
 
 function startInboxSync(intervalMs = 5 * 60 * 1000) {
     if (syncTimer) return;
-    setTimeout(() => syncAllAccounts().catch(() => {}), 10000);
-    syncTimer = setInterval(() => syncAllAccounts().catch(() => {}), intervalMs);
+    setTimeout(() => syncAllAccounts().catch(err => {
+        console.warn('Inbox sync cycle error:', err.message);
+    }), 10000);
+    syncTimer = setInterval(() => syncAllAccounts().catch(err => {
+        console.warn('Inbox sync cycle error:', err.message);
+    }), intervalMs);
 }
 
 function stopInboxSync() {

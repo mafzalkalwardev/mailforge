@@ -107,7 +107,7 @@ const markRead = async (req, res) => {
         const message = await InboxMessage.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { isRead: true },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!message) return res.status(404).json({ message: 'Message not found' });
         res.json(message);
@@ -235,7 +235,7 @@ const setLeadTag = async (req, res) => {
         const message = await InboxMessage.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { leadTag: tag },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!message) return res.status(404).json({ message: 'Message not found' });
         if (tag === 'not_interested') {
