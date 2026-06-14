@@ -14,6 +14,7 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Setup guide](https://img.shields.io/badge/Setup-SETUP.md-blue?style=for-the-badge)](SETUP.md)
 [![Contributing](https://img.shields.io/badge/Contributing-welcome-green?style=for-the-badge)](CONTRIBUTING.md)
+[![Packages](https://img.shields.io/badge/Packages-GHCR-purple?style=for-the-badge)](PACKAGES.md)
 
 </div>
 
@@ -37,7 +38,26 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ## Screenshots
 
-![Application screenshot](docs/screenshots/app.png)
+### Dashboard & bulk verify
+![Dashboard](docs/screenshots/dashboard.png)
+![Bulk import dark mode](docs/screenshots/bulk-import-dark.png)
+
+### Campaigns, inbox & templates
+![Unified inbox](docs/screenshots/inbox.png)
+![Email templates](docs/screenshots/templates.png)
+![Suppression list](docs/screenshots/suppression.png)
+
+### Dark mode
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/dashboard-dark.png" alt="Dashboard dark mode" /></td>
+<td width="50%"><img src="docs/screenshots/senders-dark.png" alt="Senders dark mode" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/login-dark.png" alt="Login dark mode" /></td>
+<td width="50%"><img src="docs/screenshots/templates-modal-dark.png" alt="Template modal dark mode" /></td>
+</tr>
+</table>
 
 ## Features
 

@@ -1,8 +1,15 @@
 {
-  "name": "mailforge",
+  "name": "@mafzalkalwardev/mailforge",
   "version": "1.4.1",
   "description": "MailForge — self-hosted email verify, campaign send, and unified inbox",
   "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mafzalkalwardev/mailforge.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -23,6 +30,8 @@
     "setup:go": "cd backend/go && go mod tidy",
     "setup": "npm install && npm run setup:go",
     "setup:new-pc": "powershell -ExecutionPolicy Bypass -File scripts/setup-new-pc.ps1",
+    "fix:readmes": "node scripts/fix-all-readmes.mjs",
+    "restore:readmes": "node scripts/restore-readme-screenshots.mjs",
     "test": "node --test tests/*.test.js",
     "docker:full": "docker compose -f docker-compose.full.yml up -d",
     "docker:full:down": "docker compose -f docker-compose.full.yml down"
