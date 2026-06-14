@@ -35,6 +35,10 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ---
 
+## Screenshots
+
+![Application screenshot](docs/screenshots/app.png)
+
 ## Features
 
 ### Verification
