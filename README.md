@@ -35,10 +35,6 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ---
 
-## Screenshots
-
-![mailforge dashboard](docs/screenshots/app.png)
-
 ## Features
 
 ### Verification
