@@ -31,34 +31,7 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ## Screenshots
 
-### Unified Inbox
-Filter by sender account, unread, starred, and important.
-
-![Unified Inbox](docs/screenshots/inbox.png)
-
-### Email Templates
-Ten freight outreach templates from the original Auto Emailer, plus AI generation.
-
-![Email Templates](docs/screenshots/templates.png)
-
-### Dark mode & dashboard
-Modals, forms, and popups are fully readable in dark mode. The dashboard includes onboarding, sender health, and live ops stats.
-
-<table>
-<tr>
-<td width="50%"><img src="docs/screenshots/dashboard.png" alt="Dashboard command center" /></td>
-<td width="50%"><img src="docs/screenshots/suppression.png" alt="Suppression list" /></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/senders-dark.png" alt="Senders dark mode" /></td>
-<td width="50%"><img src="docs/screenshots/templates-modal-dark.png" alt="Template modal dark mode" /></td>
-</tr>
-<tr>
-<td colspan="2"><img src="docs/screenshots/inbox.png" alt="Unified inbox with reply" /></td>
-</tr>
-</table>
-
----
+![mailforge dashboard](docs/screenshots/app.png)
 
 ## Features
 
