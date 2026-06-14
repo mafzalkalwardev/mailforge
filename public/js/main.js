@@ -41,23 +41,29 @@ function checkExpiredSession() {
     }
 }
 
+function applyTheme(theme) {
+    const isDark = theme === 'dark';
+    document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    document.body.classList.toggle('dark-mode', isDark);
+    localStorage.setItem('theme', theme);
+    updateThemeIcon();
+}
+
 function initTheme() {
-    const theme = localStorage.getItem('theme') || 'light';
-    document.body.classList.toggle('dark-mode', theme === 'dark');
+    applyTheme(localStorage.getItem('theme') || 'light');
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    applyTheme(isDark ? 'light' : 'dark');
 }
 
 function updateThemeIcon() {
     const btn = document.getElementById('themeToggle');
     if (!btn) return;
-    const dark = document.body.classList.contains('dark-mode');
+    const dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
     btn.innerHTML = `<i class="fa-solid ${dark ? 'fa-sun' : 'fa-moon'} me-2"></i> ${dark ? 'Light Mode' : 'Dark Mode'}`;
-}
-
-function toggleTheme() {
-    document.body.classList.toggle('dark-mode');
-    const isDark = document.body.classList.contains('dark-mode');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    updateThemeIcon();
 }
 
 function logout() {

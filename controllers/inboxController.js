@@ -1,6 +1,15 @@
 const InboxMessage = require('../models/InboxMessage');
 const SenderAccount = require('../models/SenderAccount');
 const { syncAllAccounts, syncSenderAccount } = require('../utils/imapSync');
+const { sendReplyMessage } = require('../utils/smtpClient');
+
+function parseEmailAddress(raw) {
+    const s = String(raw || '').trim();
+    const match = s.match(/<([^>]+)>/);
+    if (match) return match[1].trim().toLowerCase();
+    if (s.includes('@')) return s.toLowerCase();
+    return '';
+}
 
 function accountFilter(userId, accountId) {
     const filter = { user: userId };
@@ -144,6 +153,44 @@ const listSenderAccounts = async (req, res) => {
     }
 };
 
+const replyToMessage = async (req, res) => {
+    try {
+        const { body, subject } = req.body;
+        if (!body || !String(body).trim()) {
+            return res.status(400).json({ message: 'Reply body is required' });
+        }
+
+        const message = await InboxMessage.findOne({ _id: req.params.id, user: req.user._id })
+            .populate('senderAccount');
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+
+        const sender = message.senderAccount;
+        if (!sender || !sender.enabled) {
+            return res.status(400).json({ message: 'Sender account unavailable for reply' });
+        }
+
+        const to = parseEmailAddress(message.from);
+        if (!to) return res.status(400).json({ message: 'Could not parse recipient address' });
+
+        const messageId = await sendReplyMessage(sender, {
+            to,
+            subject: subject || message.subject,
+            body: String(body).trim(),
+            inReplyTo: message.messageId,
+            references: message.messageId,
+        });
+
+        res.json({
+            message: 'Reply sent',
+            to,
+            messageId,
+            from: sender.email,
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to send reply', error: error.message });
+    }
+};
+
 module.exports = {
     listMessages,
     getMessage,
@@ -153,4 +200,5 @@ module.exports = {
     syncInbox,
     inboxStats,
     listSenderAccounts,
+    replyToMessage,
 };

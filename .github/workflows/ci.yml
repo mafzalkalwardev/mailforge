@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
-  node:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,9 +16,9 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
-      - run: node -e "require('./utils/csvEmailParser'); require('./utils/verificationEngine'); console.log('ok')"
+      - run: npm test
 
-  go:
+  go-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

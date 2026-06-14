@@ -2,6 +2,8 @@ const BulkJob = require('../models/BulkJob');
 const Campaign = require('../models/Campaign');
 const EmailTemplate = require('../models/EmailTemplate');
 const SenderAccount = require('../models/SenderAccount');
+const InboxMessage = require('../models/InboxMessage');
+const { isSuppressed } = require('../utils/suppressionService');
 const { startCampaign, pauseCampaign, isCampaignRunning, recomputeStats } = require('../utils/campaignWorker');
 
 function rowToRecipient(row, validOnly, headers) {
@@ -56,6 +58,7 @@ const createFromBulkJob = async (req, res) => {
         subjectTemplates,
         bodyTemplates,
         settings,
+        scheduledAt,
     } = req.body;
 
     if (!bulkJobId || !name) {
@@ -81,12 +84,16 @@ const createFromBulkJob = async (req, res) => {
             return res.status(400).json({ message: 'Add at least one sender account first' });
         }
 
-        const recipients = (job.rows || [])
-            .map(row => rowToRecipient(row, validOnly, job.headers))
-            .filter(Boolean);
+        const recipients = [];
+        for (const row of job.rows || []) {
+            const rec = rowToRecipient(row, validOnly, job.headers);
+            if (!rec) continue;
+            if (await isSuppressed(req.user._id, rec.email)) continue;
+            recipients.push(rec);
+        }
 
         if (!recipients.length) {
-            return res.status(400).json({ message: 'No valid recipients in bulk job' });
+            return res.status(400).json({ message: 'No valid recipients in bulk job (after suppression filter)' });
         }
 
         const campaign = await Campaign.create({
@@ -105,9 +112,11 @@ const createFromBulkJob = async (req, res) => {
                 retries: settings?.retries ?? 2,
                 maxPerSender: settings?.maxPerSender ?? 450,
                 warmUp: settings?.warmUp !== false,
+                appendUnsubscribe: settings?.appendUnsubscribe !== false,
             },
             recipients,
-            status: 'draft',
+            status: scheduledAt && new Date(scheduledAt) > new Date() ? 'scheduled' : 'draft',
+            scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
         });
 
         recomputeStats(campaign);
@@ -151,13 +160,28 @@ const startCampaignHandler = async (req, res) => {
             return res.status(400).json({ message: 'Campaign is already running' });
         }
 
-        if (!['draft', 'paused'].includes(campaign.status)) {
+        const { scheduledAt } = req.body || {};
+        if (scheduledAt) campaign.scheduledAt = new Date(scheduledAt);
+
+        if (campaign.scheduledAt && campaign.scheduledAt > new Date()) {
+            campaign.status = 'scheduled';
+            await campaign.save();
+            return res.json({
+                message: `Campaign scheduled for ${campaign.scheduledAt.toISOString()}`,
+                id: campaign._id,
+                status: 'scheduled',
+                scheduledAt: campaign.scheduledAt,
+            });
+        }
+
+        if (!['draft', 'paused', 'scheduled'].includes(campaign.status)) {
             return res.status(400).json({ message: `Cannot start campaign in status: ${campaign.status}` });
         }
 
         campaign.status = 'running';
         campaign.startedAt = campaign.startedAt || new Date();
         campaign.lastError = '';
+        campaign.scheduledAt = undefined;
         await campaign.save();
 
         startCampaign(campaign._id);
@@ -178,6 +202,67 @@ const pauseCampaignHandler = async (req, res) => {
         res.json({ message: 'Campaign paused', status: 'paused' });
     } catch (error) {
         res.status(500).json({ message: 'Error pausing campaign', error: error.message });
+    }
+};
+
+const getCampaignAnalytics = async (req, res) => {
+    try {
+        const campaign = await Campaign.findOne({ _id: req.params.id, user: req.user._id });
+        if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
+
+        const replyCount = await InboxMessage.countDocuments({
+            user: req.user._id,
+            campaign: campaign._id,
+        });
+
+        campaign.stats.replies = replyCount;
+        await campaign.save();
+
+        const sent = campaign.stats?.sent || 0;
+        const replyRate = sent > 0 ? Math.round((replyCount / sent) * 1000) / 10 : 0;
+
+        const repliesByDay = await InboxMessage.aggregate([
+            { $match: { user: req.user._id, campaign: campaign._id } },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$receivedAt' } },
+                    count: { $sum: 1 },
+                },
+            },
+            { $sort: { _id: 1 } },
+        ]);
+
+        const repliesBySender = await InboxMessage.aggregate([
+            { $match: { user: req.user._id, campaign: campaign._id } },
+            { $group: { _id: '$senderAccount', count: { $sum: 1 } } },
+        ]);
+
+        const senderIds = repliesBySender.map(r => r._id).filter(Boolean);
+        const senders = await SenderAccount.find({ _id: { $in: senderIds } }).select('email displayName');
+        const senderMap = Object.fromEntries(senders.map(s => [String(s._id), s]));
+
+        const sendsBySender = {};
+        for (const r of campaign.recipients || []) {
+            if (r.status !== 'sent' || !r.senderEmail) continue;
+            sendsBySender[r.senderEmail] = (sendsBySender[r.senderEmail] || 0) + 1;
+        }
+
+        res.json({
+            stats: { ...campaign.stats, replies: replyCount, replyRate },
+            repliesByDay: repliesByDay.map(r => ({ date: r._id, count: r.count })),
+            repliesBySender: repliesBySender.map(r => ({
+                sender: senderMap[String(r._id)] || { email: 'Unknown' },
+                replies: r.count,
+                sent: sendsBySender[senderMap[String(r._id)]?.email] || 0,
+            })),
+            timeline: {
+                startedAt: campaign.startedAt,
+                completedAt: campaign.completedAt,
+                scheduledAt: campaign.scheduledAt,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching analytics', error: error.message });
     }
 };
 
@@ -203,4 +288,5 @@ module.exports = {
     startCampaignHandler,
     pauseCampaignHandler,
     deleteCampaign,
+    getCampaignAnalytics,
 };

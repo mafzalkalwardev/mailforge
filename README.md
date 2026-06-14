@@ -41,16 +41,20 @@ Ten freight outreach templates from the original Auto Emailer, plus AI generatio
 
 ![Email Templates](docs/screenshots/templates.png)
 
-### Dark mode
-Modals, forms, and popups are fully readable in dark mode.
+### Dark mode & dashboard
+Modals, forms, and popups are fully readable in dark mode. The dashboard includes onboarding, sender health, and live ops stats.
 
 <table>
+<tr>
+<td width="50%"><img src="docs/screenshots/dashboard.png" alt="Dashboard command center" /></td>
+<td width="50%"><img src="docs/screenshots/suppression.png" alt="Suppression list" /></td>
+</tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/senders-dark.png" alt="Senders dark mode" /></td>
 <td width="50%"><img src="docs/screenshots/templates-modal-dark.png" alt="Template modal dark mode" /></td>
 </tr>
 <tr>
-<td colspan="2"><img src="docs/screenshots/bulk-import-dark.png" alt="Bulk import modal dark mode" /></td>
+<td colspan="2"><img src="docs/screenshots/inbox.png" alt="Unified inbox with reply" /></td>
 </tr>
 </table>
 
@@ -80,9 +84,24 @@ Modals, forms, and popups are fully readable in dark mode.
 
 ### Inbox & platform
 - **Unified inbox** — view all sender accounts together or filter by one Gmail account
+- **Reply from inbox** — send threaded replies from the same sender account (In-Reply-To headers)
 - **Unread / Starred / Important** — filter pills and toggle on each message
 - **Per-account sync** — sync a single mailbox or all accounts at once
 - **JWT auth**, dark mode, per-user settings
+
+### Deliverability & compliance (v1.2)
+- **Suppression list** — block bounces, unsubscribes, and manual blocks from all campaigns
+- **Auto bounce suppression** — failed sends with bounce-like SMTP errors are added automatically
+- **Unsubscribe links** — optional footer in every campaign email with one-click opt-out page
+- **Scheduled campaigns** — set a future start time; background scheduler launches them automatically
+- **Campaign analytics** — reply rate, replies over time, performance by sender account
+- **Sender health dashboard** — sent today vs daily limit per Gmail account
+- **Onboarding checklist** — guided setup on first login
+
+### DevOps (v1.2)
+- **Docker full stack** — `docker compose -f docker-compose.full.yml up -d` (MongoDB + app)
+- **CI pipeline** — Node tests + Go build on every push
+- **Screenshot script** — `node scripts/capture-screenshots.js` for README assets
 
 ---
 
@@ -128,7 +147,19 @@ npm start
 
 Open **http://localhost:5000** → register → start verifying.
 
-One-command start (Node + Go verifier):
+### Docker (production-style)
+
+```bash
+docker compose -f docker-compose.full.yml up -d
+```
+
+This starts **MongoDB** and the **MailForge app** on port 5000. Run truemail-go on the host at `:8082`, or add the Reacher profile:
+
+```bash
+docker compose -f docker-compose.full.yml --profile reacher up -d
+```
+
+One-command start (Node + Go verifier on Windows):
 
 ```powershell
 npm run start:all
@@ -179,7 +210,11 @@ You can also go **History → plane icon → Create Campaign** at any time.
 | `POST /api/verify/jobs/:id/resume` | Resume a paused job |
 | `POST /api/verify/jobs/:id/cancel` | Stop a job |
 | `POST /api/campaigns/from-bulk-job` | Create campaign from verified list |
-| `POST /api/templates/generate` | AI-generate email template |
+| `POST /api/inbox/:id/reply` | Send threaded reply from inbox |
+| `GET /api/campaigns/:id/analytics` | Campaign reply rate & charts |
+| `GET /api/dashboard/overview` | Command center stats + onboarding |
+| `GET /api/suppression` | Suppression list CRUD |
+| `POST /api/suppression/unsubscribe` | Public one-click unsubscribe |
 
 ---
 
@@ -210,7 +245,7 @@ Browser → Node.js + Express (:5000)
 | `OPENAI_API_KEY` | — | Optional — OpenAI template generation |
 | `GROQ_API_KEY` | — | Optional — Groq free tier (recommended) |
 | `AI_PROVIDER` | `groq` | `groq`, `openrouter`, or `openai` |
-| `AI_MODEL` | — | Override default model per provider |
+| `APP_BASE_URL` | `http://localhost:5000` | Public URL for unsubscribe links |
 
 See [`.env.example`](.env.example) for all options.
 

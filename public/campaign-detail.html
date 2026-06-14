@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campaign Detail - MailOps</title>
+    <title>Campaign Detail - MailForge</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/theme-init.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
@@ -16,7 +18,7 @@
         <div class="sidebar-brand mb-4">
             <a href="/dashboard.html" class="brand-link">
                 <img src="/favicon.svg" alt="" class="brand-icon" width="36" height="36">
-                <div class="brand-text"><span class="brand-title">MailOps</span></div>
+                <div class="brand-text"><span class="brand-title">MailForge</span></div>
             </a>
         </div>
         <nav class="nav flex-column px-2"></nav>
@@ -24,20 +26,38 @@
 
     <div class="main-content">
         <div class="container-fluid py-4">
-            <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
                 <div>
                     <a href="/campaigns.html" class="text-muted small"><i class="fa-solid fa-arrow-left me-1"></i> Campaigns</a>
                     <h2 class="fw-bold mb-1" id="campaignTitle">Campaign</h2>
                     <span id="statusBadge" class="badge bg-secondary">draft</span>
+                    <span id="scheduledInfo" class="small text-muted ms-2"></span>
                 </div>
                 <div class="btn-group" id="actionBtns"></div>
             </div>
 
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Total</div><div class="fs-4 fw-bold" id="statTotal">0</div></div></div>
+                <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Sent</div><div class="fs-4 fw-bold text-success" id="statSent">0</div></div></div>
+                <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Pending</div><div class="fs-4 fw-bold text-primary" id="statPending">0</div></div></div>
+                <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Failed</div><div class="fs-4 fw-bold text-danger" id="statFailed">0</div></div></div>
+                <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Replies</div><div class="fs-4 fw-bold text-info" id="statReplies">0</div></div></div>
+                <div class="col-6 col-md-2"><div class="glass-card p-3 text-center"><div class="text-muted small">Reply rate</div><div class="fs-4 fw-bold" id="statReplyRate">0%</div></div></div>
+            </div>
+
             <div class="row g-4 mb-4">
-                <div class="col-md-3"><div class="glass-card p-3 text-center"><div class="text-muted small">Total</div><div class="fs-3 fw-bold" id="statTotal">0</div></div></div>
-                <div class="col-md-3"><div class="glass-card p-3 text-center"><div class="text-muted small">Sent</div><div class="fs-3 fw-bold text-success" id="statSent">0</div></div></div>
-                <div class="col-md-3"><div class="glass-card p-3 text-center"><div class="text-muted small">Pending</div><div class="fs-3 fw-bold text-primary" id="statPending">0</div></div></div>
-                <div class="col-md-3"><div class="glass-card p-3 text-center"><div class="text-muted small">Failed</div><div class="fs-3 fw-bold text-danger" id="statFailed">0</div></div></div>
+                <div class="col-lg-6">
+                    <div class="glass-card p-4 h-100">
+                        <h5 class="mb-3"><i class="fa-solid fa-chart-line me-2"></i>Replies over time</h5>
+                        <div style="height: 220px;"><canvas id="repliesChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="glass-card p-4 h-100">
+                        <h5 class="mb-3"><i class="fa-solid fa-at me-2"></i>Performance by sender</h5>
+                        <div id="senderStats" class="small text-muted">Loading analytics...</div>
+                    </div>
+                </div>
             </div>
 
             <div class="glass-card p-4">
@@ -59,13 +79,74 @@
     <script>
         const campaignId = new URLSearchParams(location.search).get('id');
         if (!campaignId) location.href = '/campaigns.html';
+        let repliesChart = null;
+
+        function statusClass(status) {
+            if (status === 'running') return 'primary';
+            if (status === 'completed') return 'success';
+            if (status === 'failed') return 'danger';
+            if (status === 'scheduled') return 'info';
+            if (status === 'paused') return 'warning text-dark';
+            return 'secondary';
+        }
+
+        async function loadAnalytics() {
+            try {
+                const res = await axios.get(`/api/campaigns/${campaignId}/analytics`);
+                const a = res.data;
+                document.getElementById('statReplies').textContent = a.stats.replies ?? 0;
+                document.getElementById('statReplyRate').textContent = `${a.stats.replyRate ?? 0}%`;
+
+                const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                const labels = (a.repliesByDay || []).map(r => r.date);
+                const data = (a.repliesByDay || []).map(r => r.count);
+                const ctx = document.getElementById('repliesChart').getContext('2d');
+                if (repliesChart) repliesChart.destroy();
+                repliesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels.length ? labels : ['No replies yet'],
+                        datasets: [{
+                            label: 'Replies',
+                            data: data.length ? data : [0],
+                            backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                            borderRadius: 6,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: isDark ? '#ccc' : '#666' } },
+                            y: { beginAtZero: true, ticks: { stepSize: 1, color: isDark ? '#ccc' : '#666' } },
+                        },
+                    },
+                });
+
+                const senderEl = document.getElementById('senderStats');
+                const rows = a.repliesBySender || [];
+                if (!rows.length) {
+                    senderEl.innerHTML = '<p class="mb-0">No replies linked to this campaign yet.</p>';
+                } else {
+                    senderEl.innerHTML = `<table class="table table-sm mb-0"><thead><tr><th>Sender</th><th>Sent</th><th>Replies</th><th>Rate</th></tr></thead><tbody>${rows.map(r => {
+                        const email = r.sender?.email || 'Unknown';
+                        const rate = r.sent > 0 ? Math.round((r.replies / r.sent) * 1000) / 10 : 0;
+                        return `<tr><td>${email}</td><td>${r.sent}</td><td>${r.replies}</td><td>${rate}%</td></tr>`;
+                    }).join('')}</tbody></table>`;
+                }
+            } catch (_) {}
+        }
 
         async function loadCampaign() {
             const res = await axios.get(`/api/campaigns/${campaignId}`);
             const c = res.data;
             document.getElementById('campaignTitle').textContent = c.name;
             document.getElementById('statusBadge').textContent = c.status;
-            document.getElementById('statusBadge').className = `badge bg-${c.status === 'running' ? 'primary' : c.status === 'completed' ? 'success' : c.status === 'failed' ? 'danger' : 'secondary'}`;
+            document.getElementById('statusBadge').className = `badge bg-${statusClass(c.status)}`;
+            document.getElementById('scheduledInfo').textContent = c.scheduledAt
+                ? `Scheduled: ${new Date(c.scheduledAt).toLocaleString()}`
+                : '';
 
             const s = c.stats || {};
             document.getElementById('statTotal').textContent = s.total ?? 0;
@@ -75,12 +156,13 @@
 
             const actions = document.getElementById('actionBtns');
             actions.innerHTML = '';
-            if (c.status === 'draft' || c.status === 'paused') {
-                actions.innerHTML = `<button class="btn btn-success" id="startBtn"><i class="fa-solid fa-play me-1"></i> Start</button>`;
+            if (['draft', 'paused', 'scheduled'].includes(c.status)) {
+                actions.innerHTML = `<button class="btn btn-success" id="startBtn"><i class="fa-solid fa-play me-1"></i> ${c.status === 'scheduled' ? 'Start now' : 'Start'}</button>`;
                 document.getElementById('startBtn').onclick = async () => {
                     await axios.post(`/api/campaigns/${campaignId}/start`);
                     showToast('Started', 'success');
                     loadCampaign();
+                    loadAnalytics();
                 };
             }
             if (c.status === 'running') {
@@ -95,11 +177,13 @@
             const tbody = document.getElementById('recipientsBody');
             tbody.innerHTML = (c.recipients || []).slice(0, 200).map(r => `<tr>
                 <td>${r.email}</td>
-                <td><span class="badge bg-${r.status === 'sent' ? 'success' : r.status === 'failed' ? 'danger' : 'secondary'}">${r.status}</span></td>
+                <td><span class="badge bg-${r.status === 'sent' ? 'success' : r.status === 'failed' ? 'danger' : r.status === 'skipped' ? 'warning text-dark' : 'secondary'}">${r.status}</span></td>
                 <td class="small">${r.senderEmail || '—'}</td>
                 <td class="small text-truncate" style="max-width:200px">${r.subject || '—'}</td>
                 <td class="small text-danger">${r.error || ''}</td>
             </tr>`).join('');
+
+            loadAnalytics();
         }
 
         document.addEventListener('DOMContentLoaded', () => {

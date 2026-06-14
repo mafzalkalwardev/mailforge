@@ -10,6 +10,7 @@ const { resetEngineCache } = require('./utils/verificationEngine');
 const { startInboxSync, stopInboxSync } = require('./utils/imapSync');
 const { resumeInterruptedJobs } = require('./utils/bulkVerifyWorker');
 const { seedTemplatesForAllUsers } = require('./utils/seedTemplates');
+const { startCampaignScheduler, stopCampaignScheduler } = require('./utils/campaignScheduler');
 
 dotenv.config();
 
@@ -28,6 +29,8 @@ async function start() {
         await ensureGoVerifier();
         console.log('Starting inbox sync worker...');
         startInboxSync();
+        console.log('Starting campaign scheduler...');
+        startCampaignScheduler();
         console.log('Resuming any interrupted verify jobs...');
         await resumeInterruptedJobs();
         console.log('Seeding email templates for all users...');
@@ -70,6 +73,8 @@ app.use('/api/senders', require('./routes/senderRoutes'));
 app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/inbox', require('./routes/inboxRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/suppression', require('./routes/suppressionRoutes'));
 
 app.use(errorHandler);
 
@@ -89,6 +94,7 @@ if (require.main === module) {
 
 process.on('SIGINT', () => {
     stopInboxSync();
+    stopCampaignScheduler();
     stopGoVerifier();
     process.exit(0);
 });

@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/theme-init.js"></script>
 </head>
 <body>
     <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
@@ -113,6 +114,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/sidebar.js"></script>
+    <script src="/js/confirm-modal.js"></script>
     <script src="/js/main.js"></script>
     <script>
         async function loadSenders() {
@@ -145,11 +147,17 @@
                     document.getElementById('testSendTo').value = '';
                     new bootstrap.Modal(document.getElementById('testSendModal')).show();
                 }));
-                el.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', async () => {
-                    if (!confirm('Delete sender?')) return;
-                    await axios.delete(`/api/senders/${btn.dataset.id}`);
-                    showToast('Deleted', 'success');
-                    loadSenders();
+                el.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => {
+                    showConfirm({
+                        title: 'Delete sender?',
+                        message: 'This sender account will be removed permanently.',
+                        confirmText: 'Delete',
+                        onConfirm: async () => {
+                            await axios.delete(`/api/senders/${btn.dataset.id}`);
+                            showToast('Deleted', 'success');
+                            loadSenders();
+                        },
+                    });
                 }));
             } catch (e) {
                 el.innerHTML = '<p class="text-danger">Failed to load senders</p>';

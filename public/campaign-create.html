@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/theme-init.js"></script>
 </head>
 <body>
     <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
@@ -102,6 +103,15 @@
                         <div class="form-check mt-3">
                             <input class="form-check-input" type="checkbox" id="warmUp" checked>
                             <label class="form-check-label" for="warmUp">Warm up accounts before sending</label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="appendUnsubscribe" checked>
+                            <label class="form-check-label" for="appendUnsubscribe">Append unsubscribe link to each email</label>
+                        </div>
+                        <div class="mt-3">
+                            <label class="form-label">Schedule send (optional)</label>
+                            <input type="datetime-local" id="scheduledAt" class="form-control">
+                            <div class="form-text">Leave empty to send immediately when you click Start</div>
                         </div>
                     </div>
                 </div>
@@ -283,6 +293,7 @@
             const senderAccountIds = [...document.querySelectorAll('.sender-cb:checked')].map(cb => cb.value);
             if (!senderAccountIds.length) return showToast('Select at least one sender account', 'error');
 
+            const scheduledRaw = document.getElementById('scheduledAt').value;
             const payload = {
                 bulkJobId,
                 name,
@@ -290,19 +301,22 @@
                 companyName: document.getElementById('companyName').value,
                 senderAccountIds,
                 validOnly: document.getElementById('validOnly').checked,
+                scheduledAt: scheduledRaw ? new Date(scheduledRaw).toISOString() : undefined,
                 settings: {
                     minDelayMs: Number(document.getElementById('minDelay').value) * 1000,
                     maxDelayMs: Number(document.getElementById('maxDelay').value) * 1000,
                     maxPerSender: Number(document.getElementById('maxPerSender').value),
                     warmUp: document.getElementById('warmUp').checked,
+                    appendUnsubscribe: document.getElementById('appendUnsubscribe').checked,
                 },
             };
 
             try {
                 const res = await axios.post('/api/campaigns/from-bulk-job', payload);
                 if (startAfter) {
-                    await axios.post(`/api/campaigns/${res.data._id}/start`);
-                    showToast('Campaign created and sending started', 'success');
+                    const startPayload = scheduledRaw ? { scheduledAt: new Date(scheduledRaw).toISOString() } : {};
+                    await axios.post(`/api/campaigns/${res.data._id}/start`, startPayload);
+                    showToast(scheduledRaw ? 'Campaign scheduled' : 'Campaign created and sending started', 'success');
                 } else {
                     showToast('Campaign created', 'success');
                 }

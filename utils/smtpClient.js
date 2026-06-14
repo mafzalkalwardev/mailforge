@@ -34,17 +34,28 @@ async function sendWarmUp(sender) {
     return info.messageId;
 }
 
-async function sendCampaignMessage(sender, to, subject, body) {
+async function sendCampaignMessage(sender, to, subject, body, options = {}) {
     const transport = createTransport(sender);
     const name = sender.displayName || sender.email;
-    const info = await transport.sendMail({
+    const mailOptions = {
         from: `"${name}" <${sender.email}>`,
         to,
         subject,
         text: body,
-    });
+    };
+    if (options.inReplyTo) {
+        const id = String(options.inReplyTo).replace(/^<|>$/g, '');
+        mailOptions.inReplyTo = `<${id}>`;
+        mailOptions.references = options.references || `<${id}>`;
+    }
+    const info = await transport.sendMail(mailOptions);
     await transport.close();
     return info.messageId || '';
 }
 
-module.exports = { createTransport, verifySmtp, sendWarmUp, sendCampaignMessage };
+async function sendReplyMessage(sender, { to, subject, body, inReplyTo, references }) {
+    const replySubject = subject && /^re:/i.test(subject.trim()) ? subject : `Re: ${subject || ''}`;
+    return sendCampaignMessage(sender, to, replySubject.trim(), body, { inReplyTo, references });
+}
+
+module.exports = { createTransport, verifySmtp, sendWarmUp, sendCampaignMessage, sendReplyMessage };

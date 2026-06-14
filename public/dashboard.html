@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Bulk Email Verifier</title>
-    <meta name="description" content="Email verification dashboard with bulk insights and SMTP diagnostics.">
+    <title>Dashboard - MailForge</title>
+    <meta name="description" content="MailForge command center — verify, send, and inbox overview.">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#6366f1">
@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/theme-init.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .stat-card {
@@ -71,23 +72,14 @@
             <a href="/dashboard.html" class="brand-link">
                 <img src="/favicon.svg" alt="" class="brand-icon" width="36" height="36">
                 <div class="brand-text">
-                    <span class="brand-title">Email Verifier</span>
+                    <span class="brand-title">MailForge</span>
                     <span class="engine-badge brand-badge" data-engine-badge>truemail-go</span>
                 </div>
             </a>
         </div>
-        <nav class="nav flex-column px-2">
-            <a class="nav-link active" href="/dashboard.html"><i class="fa-solid fa-chart-pie me-2"></i> Dashboard</a>
-            <a class="nav-link" href="/single.html"><i class="fa-solid fa-magnifying-glass me-2"></i> Single Verify</a>
-            <a class="nav-link" href="/bulk.html"><i class="fa-solid fa-file-csv me-2"></i> Bulk Verify</a>
-            <a class="nav-link" href="/history.html"><i class="fa-solid fa-clock-rotate-left me-2"></i> History</a>
-            <a class="nav-link" href="/settings.html"><i class="fa-solid fa-gear me-2"></i> Settings</a>
-            <hr class="text-secondary mx-3">
-            <button id="themeToggle" class="btn btn-link nav-link text-start"><i class="fa-solid fa-moon me-2"></i> Toggle Theme</button>
-            <button id="logoutBtn" class="btn btn-link nav-link text-start text-danger"><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</button>
-        </nav>
+        <nav class="nav flex-column px-2"></nav>
         <div class="sidebar-footer">
-            <small class="text-muted">Self-hosted · v1.0.1</small>
+            <small class="text-muted">Self-hosted · v1.2.0</small>
         </div>
     </div>
 
@@ -95,7 +87,24 @@
     <div class="main-content">
         <div class="page-header fade-in">
             <h2>Welcome back, <span id="userNameDisplay" class="gradient-text"></span></h2>
-            <p class="page-subtitle">Your bulk email verification overview</p>
+            <p class="page-subtitle">Your email operations command center</p>
+        </div>
+
+        <div id="onboardingCard" class="glass-card p-4 mb-4 fade-in d-none">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-rocket me-2 text-primary"></i>Get started with MailForge</h5>
+            <div class="row g-3" id="onboardingSteps"></div>
+        </div>
+
+        <div class="row g-3 mb-4 fade-in" id="commandCenter">
+            <div class="col-md-3"><div class="glass-card p-3"><div class="text-muted small">Unread inbox</div><div class="fs-4 fw-bold" id="cmdUnread">–</div></div></div>
+            <div class="col-md-3"><div class="glass-card p-3"><div class="text-muted small">Running campaigns</div><div class="fs-4 fw-bold text-success" id="cmdRunning">–</div></div></div>
+            <div class="col-md-3"><div class="glass-card p-3"><div class="text-muted small">Suppressed emails</div><div class="fs-4 fw-bold text-warning" id="cmdSuppressed">–</div></div></div>
+            <div class="col-md-3"><div class="glass-card p-3"><div class="text-muted small">Sender accounts</div><div class="fs-4 fw-bold" id="cmdSenders">–</div></div></div>
+        </div>
+
+        <div class="glass-card p-4 mb-4 fade-in d-none" id="senderHealthCard">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-heart-pulse me-2"></i>Sender health</h5>
+            <div id="senderHealthList" class="small"></div>
         </div>
 
         <!-- Stats Cards -->
@@ -243,16 +252,56 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                const res = await axios.get('/api/history/stats');
-                const { total, valid, invalid, unknown } = res.data;
+                const [statsRes, overviewRes] = await Promise.all([
+                    axios.get('/api/history/stats'),
+                    axios.get('/api/dashboard/overview'),
+                ]);
+                const { total, valid, invalid, unknown } = statsRes.data;
+                const ov = overviewRes.data;
 
                 document.getElementById('statTotal').innerText   = total;
                 document.getElementById('statValid').innerText   = valid;
                 document.getElementById('statInvalid').innerText = invalid;
                 document.getElementById('statUnknown').innerText = unknown;
 
-                // Doughnut Chart
-                const isDark = document.body.classList.contains('dark-mode');
+                document.getElementById('cmdUnread').textContent = ov.inbox?.unread ?? 0;
+                document.getElementById('cmdRunning').textContent = ov.campaigns?.running ?? 0;
+                document.getElementById('cmdSuppressed').textContent = ov.suppression?.total ?? 0;
+                document.getElementById('cmdSenders').textContent = ov.senders?.length ?? 0;
+
+                const ob = ov.onboarding || {};
+                if (ob.completedSteps < 4) {
+                    const steps = [
+                        { done: ob.hasSenders, label: 'Add sender accounts', href: '/senders.html', icon: 'fa-at' },
+                        { done: ob.hasVerifiedList, label: 'Verify a contact list', href: '/bulk.html', icon: 'fa-file-csv' },
+                        { done: ob.hasCampaign, label: 'Create a campaign', href: '/campaign-create.html', icon: 'fa-paper-plane' },
+                        { done: ob.hasInboxActivity, label: 'Check unified inbox', href: '/inbox.html', icon: 'fa-inbox' },
+                    ];
+                    document.getElementById('onboardingSteps').innerHTML = steps.map(s => `
+                        <div class="col-md-6 col-lg-3">
+                            <a href="${s.href}" class="text-decoration-none">
+                                <div class="insight-item ${s.done ? 'border border-success border-opacity-25' : ''}">
+                                    <div class="insight-icon" style="background:${s.done ? 'rgba(40,167,69,0.15)' : 'rgba(99,102,241,0.12)'};color:${s.done ? '#28a745' : '#6366f1'};">
+                                        <i class="fa-solid ${s.done ? 'fa-circle-check' : s.icon}"></i>
+                                    </div>
+                                    <div><div class="fw-semibold small">${s.label}</div><div class="text-muted" style="font-size:0.75rem">${s.done ? 'Done' : 'Get started →'}</div></div>
+                                </div>
+                            </a>
+                        </div>`).join('');
+                    document.getElementById('onboardingCard').classList.remove('d-none');
+                }
+
+                if (ov.senders?.length) {
+                    document.getElementById('senderHealthCard').classList.remove('d-none');
+                    document.getElementById('senderHealthList').innerHTML = `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Account</th><th>Sent today</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${ov.senders.map(s => `<tr>
+                        <td>${s.displayName || s.email}<br><small class="text-muted">${s.email}</small></td>
+                        <td>${s.sentToday}/${s.dailyLimit}</td>
+                        <td>${s.remaining}</td>
+                        <td><span class="badge ${s.enabled ? 'bg-success' : 'bg-secondary'}">${s.enabled ? 'Active' : 'Disabled'}</span></td>
+                    </tr>`).join('')}</tbody></table></div>`;
+                }
+
+                const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
                 const ctx = document.getElementById('statsChart').getContext('2d');
                 new Chart(ctx, {
                     type: 'doughnut',

@@ -1,0 +1,52 @@
+# MailForge full stack — MongoDB + app + optional Reacher verifier
+# Usage: docker compose -f docker-compose.full.yml up -d
+# App: http://localhost:5000
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: mailforge-mongo
+    restart: unless-stopped
+    volumes:
+      - mailforge_mongo:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  reacher:
+    image: reacherhq/backend:latest
+    container_name: mailforge-reacher
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      RUST_LOG: info
+    profiles:
+      - reacher
+
+  mailforge:
+    build: .
+    container_name: mailforge-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/mailforge
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5000}
+      VERIFIER_ENGINE: ${VERIFIER_ENGINE:-auto}
+      TRUEMAIL_GO_URL: ${TRUEMAIL_GO_URL:-http://host.docker.internal:8082}
+      REACHER_URL: http://reacher:8080
+    depends_on:
+      mongo:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  mailforge_mongo:

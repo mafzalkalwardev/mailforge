@@ -30,9 +30,10 @@ const CampaignSchema = new mongoose.Schema(
         senderAccountIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'SenderAccount' }],
         status: {
             type: String,
-            enum: ['draft', 'running', 'paused', 'completed', 'failed', 'cancelled'],
+            enum: ['draft', 'scheduled', 'running', 'paused', 'completed', 'failed', 'cancelled'],
             default: 'draft',
         },
+        scheduledAt: { type: Date },
         validOnly: { type: Boolean, default: true },
         settings: {
             minDelayMs: { type: Number, default: 5000 },
@@ -48,6 +49,7 @@ const CampaignSchema = new mongoose.Schema(
             sent: { type: Number, default: 0 },
             failed: { type: Number, default: 0 },
             skipped: { type: Number, default: 0 },
+            replies: { type: Number, default: 0 },
         },
         startedAt: Date,
         completedAt: Date,

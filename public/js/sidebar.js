@@ -8,6 +8,7 @@
         { href: '/senders.html', icon: 'fa-at', label: 'Senders' },
         { href: '/templates.html', icon: 'fa-file-lines', label: 'Templates' },
         { href: '/inbox.html', icon: 'fa-inbox', label: 'Inbox' },
+        { href: '/suppression.html', icon: 'fa-ban', label: 'Suppression' },
         { href: '/history.html', icon: 'fa-clock-rotate-left', label: 'History' },
         { href: '/settings.html', icon: 'fa-gear', label: 'Settings' },
     ];

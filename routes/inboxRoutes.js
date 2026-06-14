@@ -9,6 +9,7 @@ const {
     syncInbox,
     inboxStats,
     listSenderAccounts,
+    replyToMessage,
 } = require('../controllers/inboxController');
 
 const router = express.Router();
@@ -20,7 +21,8 @@ router.post('/sync', syncInbox);
 router.get('/', listMessages);
 router.post('/:id/star', toggleStar);
 router.post('/:id/important', toggleImportant);
-router.get('/:id', getMessage);
+router.post('/:id/reply', replyToMessage);
 router.post('/:id/read', markRead);
+router.get('/:id', getMessage);
 
 module.exports = router;

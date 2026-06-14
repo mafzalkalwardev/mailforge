@@ -2,6 +2,7 @@ const Campaign = require('../models/Campaign');
 const SenderAccount = require('../models/SenderAccount');
 const { renderCampaignEmail } = require('./templateRenderer');
 const { sendWarmUp, sendCampaignMessage } = require('./smtpClient');
+const { isSuppressed, addSuppression, looksLikeBounce } = require('./suppressionService');
 
 const activeWorkers = new Map();
 
@@ -91,6 +92,14 @@ async function runCampaignWorker(campaignId) {
                 const recipient = campaign.recipients.id(recipientRef._id);
                 if (!recipient || recipient.status !== 'pending') continue;
 
+                if (await isSuppressed(campaign.user, recipient.email)) {
+                    recipient.status = 'skipped';
+                    recipient.error = 'On suppression list';
+                    recomputeStats(campaign);
+                    await campaign.save();
+                    continue;
+                }
+
                 if ((senderCounts.get(String(sender._id)) || 0) >= maxPerSender) {
                     recipient.status = 'skipped';
                     recipient.error = 'Sender daily limit reached';
@@ -100,7 +109,9 @@ async function runCampaignWorker(campaignId) {
                 }
 
                 const row = { Email: recipient.email, ...(recipient.rowData || {}) };
-                const { subject, body } = renderCampaignEmail(campaign, row, sender);
+                const { subject, body } = renderCampaignEmail(campaign, row, sender, {
+                    userId: campaign.user,
+                });
 
                 let success = false;
                 let lastError = '';
@@ -125,6 +136,11 @@ async function runCampaignWorker(campaignId) {
                 if (!success) {
                     recipient.status = 'failed';
                     recipient.error = lastError || 'Send failed';
+                    if (looksLikeBounce(lastError)) {
+                        try {
+                            await addSuppression(campaign.user, recipient.email, 'bounce', lastError.slice(0, 200));
+                        } catch (_) {}
+                    }
                 }
 
                 recomputeStats(campaign);

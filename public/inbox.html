@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/theme-init.js"></script>
 </head>
 <body>
     <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
@@ -154,7 +155,12 @@
                 <h5>${m.subject || '(no subject)'}</h5>
                 ${m.campaign ? `<p class="small"><span class="badge bg-info text-dark">Reply to campaign: ${m.campaign.name || ''}</span></p>` : ''}
                 <hr>
-                <pre class="small mb-0" style="white-space: pre-wrap; font-family: inherit;">${displayBody(m)}</pre>`;
+                <pre class="small mb-3" id="msgBody" style="white-space: pre-wrap; font-family: inherit;">${displayBody(m)}</pre>
+                <div class="border-top pt-3">
+                    <h6 class="fw-semibold mb-2"><i class="fa-solid fa-reply me-1"></i> Reply</h6>
+                    <textarea id="replyBody" class="form-control mb-2" rows="4" placeholder="Write your reply..."></textarea>
+                    <button type="button" class="btn btn-primary btn-sm" id="sendReplyBtn"><i class="fa-solid fa-paper-plane me-1"></i>Send reply</button>
+                </div>`;
             document.getElementById('starBtn').addEventListener('click', async e => {
                 e.stopPropagation();
                 await axios.post(`/api/inbox/${id}/star`);
@@ -166,6 +172,21 @@
                 await axios.post(`/api/inbox/${id}/important`);
                 showMessage(id);
                 loadStats();
+            });
+            document.getElementById('sendReplyBtn').addEventListener('click', async () => {
+                const body = document.getElementById('replyBody').value.trim();
+                if (!body) return showToast('Enter a reply message', 'error');
+                const btn = document.getElementById('sendReplyBtn');
+                btn.disabled = true;
+                try {
+                    await axios.post(`/api/inbox/${id}/reply`, { body });
+                    showToast('Reply sent', 'success');
+                    document.getElementById('replyBody').value = '';
+                } catch (e) {
+                    showToast(e.response?.data?.message || 'Reply failed', 'error');
+                } finally {
+                    btn.disabled = false;
+                }
             });
             loadMessages(document.getElementById('searchInput').value);
             loadStats();
