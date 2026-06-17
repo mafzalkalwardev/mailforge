@@ -1,21 +1,22 @@
 /**
- * Original templates from Auto Emailer (email_sender.py) — 10 subjects + 10 bodies.
+ * Original templates from Auto Emailer (email_sender.py) - 10 subjects + 10 bodies.
  * Random subject + random body per send (same behavior as the Python sender).
  */
 
-const FREIGHT_DISPATCH_NAME = 'Freight Dispatch — INDUS Transports';
+const FREIGHT_DISPATCH_NAME = 'Freight Dispatch - INDUS Transports';
+const FREIGHT_PHONE = '(512) 761-6455';
 
 const FREIGHT_SUBJECT_TEMPLATES = [
-    "Available Loads – Let's Work Together",
-    "Steady Freight – Let's Keep Your Trucks Moving",
-    "Freight Opportunities in {State} – Let's Connect",
-    "Let's Keep Your Fleet Busy – Freight Available Now",
-    "Dispatch Support for Your Fleet – Let's Talk Loads",
-    "Open Lanes in {State} – Let's Fill Your Schedule",
-    "Freight Dispatch Opportunities – Let's Build Together",
-    "Let's Maximize Your Miles – Freight Available in {State}",
-    "Ready to Dispatch – Let's Get Your Trucks Moving",
-    "Let's Partner Up – Freight Opportunities in {State}",
+    "Available Loads - Let's Work Together",
+    "Steady Freight - Let's Keep Your Trucks Moving",
+    "Freight Opportunities in {State} - Let's Connect",
+    "Let's Keep Your Fleet Busy - Freight Available Now",
+    "Dispatch Support for Your Fleet - Let's Talk Loads",
+    "Open Lanes in {State} - Let's Fill Your Schedule",
+    "Freight Dispatch Opportunities - Let's Build Together",
+    "Let's Maximize Your Miles - Freight Available in {State}",
+    "Ready to Dispatch - Let's Get Your Trucks Moving",
+    "Let's Partner Up - Freight Opportunities in {State}",
 ];
 
 const FREIGHT_BODY_TEMPLATES = [
@@ -32,14 +33,14 @@ Looking forward to working with you!
 Best regards,
 {SENDER_NAME}
 {COMPANY_NAME}
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
 
 I'm reaching out to connect with dependable carriers who are ready for consistent freight opportunities. We're currently dispatching loads in {State}, and I'd love to help keep your trucks running profitably.
 
-If you're open to new lanes or want to maximize your current routes, send me your MC number and ZIP code — I'll match you with the best loads available.
+If you're open to new lanes or want to maximize your current routes, send me your MC number and ZIP code - I'll match you with the best loads available.
 
 Let's build something solid together.
 
@@ -47,7 +48,7 @@ Best regards,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -62,7 +63,7 @@ Best,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -77,7 +78,7 @@ Best regards,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -92,7 +93,7 @@ Best,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -107,7 +108,7 @@ Best regards,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -122,7 +123,7 @@ Best,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -137,7 +138,7 @@ Best regards,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -152,7 +153,7 @@ Best,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 
     `Hi {Name},
@@ -167,7 +168,7 @@ Best regards,
 {SENDER_NAME}
 {COMPANY_NAME}
 
-(785 572-4805)
+${FREIGHT_PHONE}
 {SENDER_EMAIL}`,
 ];
 
@@ -179,7 +180,7 @@ const FREIGHT_DISPATCH_TEMPLATE = {
     bodyTemplates: FREIGHT_BODY_TEMPLATES,
 };
 
-/** Ten individual templates — one subject + one body each (from Auto Emailer). */
+/** Ten individual templates - one subject + one body each (from Auto Emailer). */
 const FREIGHT_VARIANT_TEMPLATES = FREIGHT_SUBJECT_TEMPLATES.map((subject, i) => ({
     name: `Freight Outreach ${i + 1}`,
     companyName: 'INDUS TRANSPORTS LLC',
@@ -190,6 +191,7 @@ const FREIGHT_VARIANT_TEMPLATES = FREIGHT_SUBJECT_TEMPLATES.map((subject, i) => 
 
 module.exports = {
     FREIGHT_DISPATCH_NAME,
+    FREIGHT_PHONE,
     FREIGHT_DISPATCH_TEMPLATE,
     FREIGHT_VARIANT_TEMPLATES,
     FREIGHT_SUBJECT_TEMPLATES,

@@ -4,6 +4,7 @@ const {
     listMessages,
     getMessage,
     markRead,
+    markAllRead,
     toggleStar,
     toggleImportant,
     syncInbox,
@@ -19,6 +20,7 @@ router.use(protect);
 router.get('/stats', inboxStats);
 router.get('/accounts', listSenderAccounts);
 router.post('/sync', syncInbox);
+router.post('/read-all', markAllRead);
 router.get('/', listMessages);
 router.post('/:id/star', toggleStar);
 router.post('/:id/important', toggleImportant);

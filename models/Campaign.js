@@ -10,6 +10,7 @@ const RecipientSchema = new mongoose.Schema(
             default: 'pending',
         },
         subject: String,
+        body: String,
         error: String,
         senderEmail: String,
         messageId: String,
@@ -41,6 +42,7 @@ const CampaignSchema = new mongoose.Schema(
             retries: { type: Number, default: 2 },
             maxPerSender: { type: Number, default: 450 },
             warmUp: { type: Boolean, default: true },
+            appendUnsubscribe: { type: Boolean, default: false },
         },
         recipients: [RecipientSchema],
         stats: {

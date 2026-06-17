@@ -15,7 +15,7 @@ function cleanUrl(value) {
 
 function defaultSettings() {
     return {
-        verifierEngine: (process.env.VERIFIER_ENGINE || 'auto').toLowerCase(),
+        verifierEngine: (process.env.VERIFIER_ENGINE || 'truemail').toLowerCase(),
         goVerifierUrl: cleanUrl(process.env.GO_VERIFIER_URL || 'http://localhost:8082'),
         reacherUrl: cleanUrl(process.env.REACHER_URL || 'http://localhost:8081'),
         smtpProxy: process.env.SMTP_PROXY || '',
@@ -38,12 +38,12 @@ function defaultSettings() {
 function sanitizeSettings(input = {}) {
     const defaults = defaultSettings();
     const allowedEngines = ['auto', 'truemail', 'reacher'];
-    const verifierEngine = String(input.verifierEngine || defaults.verifierEngine || 'auto').toLowerCase();
+    const verifierEngine = String(input.verifierEngine || defaults.verifierEngine || 'truemail').toLowerCase();
     const bulkConcurrency = parseInt(input.bulkConcurrency ?? defaults.bulkConcurrency, 10);
     const reacherTimeoutMs = parseInt(input.reacherTimeoutMs ?? defaults.reacherTimeoutMs, 10);
 
     return {
-        verifierEngine: allowedEngines.includes(verifierEngine) ? verifierEngine : 'auto',
+        verifierEngine: allowedEngines.includes(verifierEngine) ? verifierEngine : 'truemail',
         goVerifierUrl: cleanUrl(input.goVerifierUrl ?? defaults.goVerifierUrl),
         reacherUrl: cleanUrl(input.reacherUrl ?? defaults.reacherUrl),
         smtpProxy: String(input.smtpProxy ?? defaults.smtpProxy ?? '').trim(),

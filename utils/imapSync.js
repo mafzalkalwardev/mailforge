@@ -47,8 +47,20 @@ function extractTextFromSource(source) {
     if (!source) return '';
     const raw = Buffer.isBuffer(source) ? source.toString('utf8') : String(source);
     const parts = raw.split(/\r?\n\r?\n/);
-    if (parts.length < 2) return raw.slice(0, 5000);
-    return parts.slice(1).join('\n\n').slice(0, 50000);
+    const headers = parts[0] || '';
+    let body = parts.length < 2 ? raw : parts.slice(1).join('\n\n');
+    if (/content-transfer-encoding:\s*quoted-printable/i.test(headers)) {
+        body = decodeQuotedPrintable(body);
+    }
+    return body.slice(0, 50000);
+}
+
+function decodeQuotedPrintable(value) {
+    const binary = String(value || '')
+        .replace(/=\r?\n/g, '')
+        .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    return Buffer.from(binary, 'binary').toString('utf8')
+        .replace(/\r\n/g, '\n');
 }
 
 function extractHeader(source, name) {
@@ -57,6 +69,14 @@ function extractHeader(source, name) {
     const re = new RegExp(`^${name}:\\s*(.+)$`, 'im');
     const m = raw.match(re);
     return m ? m[1].trim() : '';
+}
+
+function formatAddressList(list, fallback = '') {
+    if (!list || !list.length) return fallback;
+    return list.map(addr => {
+        const email = addr.address || '';
+        return `${addr.name || ''} <${email}>`.trim();
+    }).filter(Boolean).join(', ');
 }
 
 function createImapClient(account) {
@@ -81,6 +101,27 @@ function createImapClient(account) {
     });
 
     return client;
+}
+
+async function findSentMailbox(client) {
+    const commonNames = ['[Gmail]/Sent Mail', 'Sent', 'Sent Mail', 'Sent Items', 'Sent Messages'];
+    try {
+        const boxes = await client.list();
+        const sentByFlag = boxes.find(box => {
+            const flags = [
+                ...(box.specialUse ? [box.specialUse] : []),
+                ...(box.flags ? Array.from(box.flags) : []),
+            ].map(flag => String(flag).toLowerCase());
+            return flags.some(flag => flag.includes('sent'));
+        });
+        if (sentByFlag?.path) return sentByFlag.path;
+
+        const byName = boxes.find(box => commonNames.some(name => String(box.path || '').toLowerCase() === name.toLowerCase()));
+        if (byName?.path) return byName.path;
+    } catch (err) {
+        console.warn('Sent mailbox discovery failed:', err.message);
+    }
+    return commonNames;
 }
 
 async function safeCloseClient(client) {
@@ -135,72 +176,110 @@ async function findCampaignForReply(userId, inReplyTo, subject) {
     return null;
 }
 
-async function syncSenderAccount(account) {
-    const client = createImapClient(account);
+async function syncMailboxMessages(client, account, mailboxPath, options = {}) {
+    const folder = options.folder || 'inbox';
+    const lock = await client.getMailboxLock(mailboxPath);
     let synced = 0;
 
     try {
-        await client.connect();
-        const lock = await client.getMailboxLock('INBOX');
-        try {
-            const since = account.lastSyncAt || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            const uids = await client.search({ seen: false, since });
-            if (!uids || !uids.length) return 0;
-
-            for await (const msg of client.fetch(uids, { envelope: true, source: true, uid: true })) {
-                const uid = String(msg.uid);
-                const exists = await InboxMessage.findOne({
-                    user: account.user,
-                    senderAccount: account._id,
-                    uid,
-                });
-                if (exists) continue;
-
-                const from = msg.envelope?.from?.[0]
-                    ? `${msg.envelope.from[0].name || ''} <${msg.envelope.from[0].address}>`.trim()
-                    : '';
-                const to = msg.envelope?.to?.[0]?.address || account.email;
-                const subject = msg.envelope?.subject || '(no subject)';
-                const bodyText = extractTextFromSource(msg.source);
-                const messageId = extractHeader(msg.source, 'Message-ID') || msg.envelope?.messageId || '';
-                const inReplyTo = extractHeader(msg.source, 'In-Reply-To');
-                const receivedAt = msg.envelope?.date || new Date();
-
-                const campaignId = await findCampaignForReply(account.user, inReplyTo, subject);
-                const isBounce = detectBounce(from, subject, bodyText);
-                const threadKey = threadKeyFromMessage(inReplyTo, messageId, subject);
-
-                await InboxMessage.create({
-                    user: account.user,
-                    senderAccount: account._id,
-                    campaign: campaignId,
-                    uid,
-                    messageId,
-                    inReplyTo,
-                    from,
-                    to,
-                    subject,
-                    bodyPreview: bodyText.slice(0, 500),
-                    body: bodyText,
-                    isRead: false,
-                    isBounce,
-                    threadKey,
-                    receivedAt,
-                });
-
-                if (isBounce) {
-                    const bounced = extractBouncedEmail(bodyText, subject);
-                    if (bounced) {
-                        try {
-                            await addSuppression(account.user, bounced, 'bounce', `Inbox bounce: ${subject}`.slice(0, 200));
-                        } catch (_) {}
-                    }
-                }
-                synced++;
-            }
-        } finally {
-            lock.release();
+        const since = options.since || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        let uids = await client.search(options.unreadOnly ? { seen: false, since } : { since });
+        if (!uids || !uids.length) return 0;
+        if (options.maxMessages && uids.length > options.maxMessages) {
+            uids = uids.slice(-options.maxMessages);
         }
+
+        for await (const msg of client.fetch(uids, { envelope: true, source: true, uid: true })) {
+            const uid = folder === 'sent' ? `sent:${mailboxPath}:${msg.uid}` : String(msg.uid);
+            const exists = await InboxMessage.findOne({
+                user: account.user,
+                senderAccount: account._id,
+                uid,
+            });
+            if (exists) continue;
+
+            const subject = msg.envelope?.subject || '(no subject)';
+            const bodyText = extractTextFromSource(msg.source);
+            const messageId = extractHeader(msg.source, 'Message-ID') || msg.envelope?.messageId || '';
+            const inReplyTo = extractHeader(msg.source, 'In-Reply-To');
+            const receivedAt = msg.envelope?.date || new Date();
+            const from = folder === 'sent'
+                ? account.email
+                : formatAddressList(msg.envelope?.from);
+            const to = folder === 'sent'
+                ? formatAddressList(msg.envelope?.to, '')
+                : (msg.envelope?.to?.[0]?.address || account.email);
+
+            const campaignId = folder === 'sent' ? null : await findCampaignForReply(account.user, inReplyTo, subject);
+            const isBounce = folder === 'sent' ? false : detectBounce(from, subject, bodyText);
+            const threadKey = threadKeyFromMessage(inReplyTo, messageId, subject);
+
+            await InboxMessage.create({
+                user: account.user,
+                senderAccount: account._id,
+                campaign: campaignId,
+                folder,
+                uid,
+                messageId,
+                inReplyTo,
+                from,
+                to,
+                subject,
+                bodyPreview: bodyText.slice(0, 500),
+                body: bodyText,
+                isRead: folder === 'sent',
+                isBounce,
+                threadKey,
+                receivedAt,
+            });
+
+            if (isBounce) {
+                const bounced = extractBouncedEmail(bodyText, subject);
+                if (bounced) {
+                    try {
+                        await addSuppression(account.user, bounced, 'bounce', `Inbox bounce: ${subject}`.slice(0, 200));
+                    } catch (_) {}
+                }
+            }
+            synced++;
+        }
+    } finally {
+        lock.release();
+    }
+
+    return synced;
+}
+
+async function syncSentMailboxes(client, account) {
+    const sentMailbox = await findSentMailbox(client);
+    const candidates = Array.isArray(sentMailbox) ? sentMailbox : [sentMailbox];
+    for (const mailboxPath of candidates) {
+        try {
+            return await syncMailboxMessages(client, account, mailboxPath, {
+                folder: 'sent',
+                since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                maxMessages: 200,
+            });
+        } catch (err) {
+            if (!Array.isArray(sentMailbox)) throw err;
+        }
+    }
+    return 0;
+}
+
+async function syncSenderAccount(account) {
+    const client = createImapClient(account);
+    let inboxSynced = 0;
+    let sentSynced = 0;
+
+    try {
+        await client.connect();
+        inboxSynced = await syncMailboxMessages(client, account, 'INBOX', {
+            folder: 'inbox',
+            unreadOnly: true,
+            since: account.lastSyncAt || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        });
+        sentSynced = await syncSentMailboxes(client, account);
 
         account.lastSyncAt = new Date();
         await account.save();
@@ -208,7 +287,7 @@ async function syncSenderAccount(account) {
         await safeCloseClient(client);
     }
 
-    return synced;
+    return { inbox: inboxSynced, sent: sentSynced, total: inboxSynced + sentSynced };
 }
 
 function sleep(ms) {
@@ -223,7 +302,9 @@ async function syncAllAccounts() {
         for (const account of accounts) {
             try {
                 const count = await syncSenderAccount(account);
-                if (count > 0) console.log(`Inbox sync: ${count} new message(s) for ${account.email}`);
+                if (count.total > 0) {
+                    console.log(`Inbox sync: ${count.inbox} inbox, ${count.sent} sent new message(s) for ${account.email}`);
+                }
             } catch (err) {
                 console.warn(`Inbox sync failed for ${account.email}:`, err.message);
             }

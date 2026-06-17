@@ -5,6 +5,12 @@ const InboxMessageSchema = new mongoose.Schema(
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         senderAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'SenderAccount', required: true },
         campaign: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign' },
+        folder: {
+            type: String,
+            enum: ['inbox', 'sent'],
+            default: 'inbox',
+            index: true,
+        },
         uid: { type: String, required: true },
         messageId: { type: String, trim: true },
         inReplyTo: { type: String, trim: true },
