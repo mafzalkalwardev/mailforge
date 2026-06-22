@@ -20,7 +20,7 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ---
 
-> **New PC?** Follow **[SETUP.md](SETUP.md)** for a full install checklist, or run `npm run setup:new-pc` after cloning.
+> **New PC or client machine?** Double-click `Client-Install-MailForge.bat` for guided Windows setup, follow **[SETUP.md](SETUP.md)** for the full checklist, or run `npm run setup:new-pc` after cloning.
 
 ---
 
@@ -66,12 +66,15 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 - **Strict SMTP validity** — 550/553/503 rejections and IP-block responses are **never** marked valid; blocked checks show as `unknown`
 - **Backend bulk jobs** — upload CSV/XLSX, verification runs on the server; switch tabs freely
 - **Pause / resume / stop** — control long-running verify jobs without losing progress
-- **Bulk CSV / XLSX** — finds emails in any column; valid-only export
+- **Download while running** — export completed rows or valid-only rows before a long job finishes
+- **Recent job downloads** — Bulk Verify loads recent jobs immediately and can download saved or in-progress results
+- **Bulk CSV / XLSX** — finds emails in any column; exports keep original columns first and append verification fields
 
 ### Campaigns & sending
 - **Verify → send pipeline** — auto-redirect to campaign creator when verification completes (toggle in Settings)
 - **Create from verified lists** — valid-only recipients with original CSV columns preserved
 - **Multi-Gmail rotation** — delays, retries, warm-up, bulk sender import
+- **Editable senders** — update email username, display name, app password, SMTP/IMAP hosts, daily limits, warm-up day, and today's send count
 - **Create & start** — launch a campaign in one click from the wizard
 
 ### Templates
@@ -164,6 +167,22 @@ docker compose up -d
 
 ### Install & run
 
+For a client PC, use the guided Windows installer:
+
+```bat
+Client-Install-MailForge.bat
+```
+
+It checks Node.js, Go, Docker Desktop, and npm; offers `winget` installs for missing tools; creates `.env`; installs Node and Go dependencies; starts local MongoDB; and opens MailForge.
+
+To validate prerequisites without installing or starting services:
+
+```bat
+Client-Install-MailForge.bat --check
+```
+
+Manual install:
+
 ```powershell
 cd MailForge
 copy .env.example .env
@@ -241,7 +260,7 @@ flowchart LR
 1. **Bulk Verify** — upload your list; pause/resume as needed
 2. **Auto-redirect** — when done, opens Create Campaign with the verified list loaded
 3. **Templates** — pick a starter template or generate spam-safe copy with AI
-4. **Senders** — add Gmail accounts (App Passwords) or bulk import
+4. **Senders** — add Gmail accounts (App Passwords), bulk import, or edit account details and warm-up limits later
 5. **Create & Start** — launch the campaign
 6. **Inbox** — sync and read replies
 
@@ -257,7 +276,11 @@ You can also go **History → plane icon → Create Campaign** at any time.
 | `POST /api/verify/jobs/:id/pause` | Pause a running job |
 | `POST /api/verify/jobs/:id/resume` | Resume a paused job |
 | `POST /api/verify/jobs/:id/cancel` | Stop a job |
+| `GET /api/verify/jobs/recent` | List recent backend verification jobs |
+| `GET /api/verify/jobs/:id?full=1` | Get completed and pending rows for full or partial download |
 | `POST /api/campaigns/from-bulk-job` | Create campaign from verified list |
+| `GET /api/senders` | List sender accounts with warm-up status |
+| `PUT /api/senders/:id` | Edit sender email, password, SMTP/IMAP settings, enabled flags, daily limit, warm-up day, and sent-today count |
 | `POST /api/inbox/:id/reply` | Send threaded reply from inbox |
 | `GET /api/campaigns/:id/analytics` | Campaign reply rate & charts |
 | `GET /api/dashboard/overview` | Command center stats + onboarding |
