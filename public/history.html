@@ -63,6 +63,9 @@
                     <button type="button" class="btn btn-sm btn-outline-success" id="exportSelectedAllBtn" disabled>
                         <i class="fa-solid fa-download me-1"></i>Download All (CSV)
                     </button>
+                    <button type="button" class="btn btn-sm btn-success" id="exportSelectedValidBtn" disabled>
+                        <i class="fa-solid fa-check me-1"></i>Download Valid (CSV)
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-info" id="compareJobsBtn" data-bs-toggle="modal" data-bs-target="#compareModal">
                         <i class="fa-solid fa-code-compare me-1"></i>Compare lists
                     </button>
@@ -177,8 +180,10 @@
 
         function updateExportButtons() {
             const hasSelection = selectedJobIds.size > 0;
-            document.getElementById('exportSelectedAllBtn').disabled = !hasSelection;
-            document.getElementById('exportSelectedValidBtn').disabled = !hasSelection;
+            const allBtn = document.getElementById('exportSelectedAllBtn');
+            const validBtn = document.getElementById('exportSelectedValidBtn');
+            if (allBtn) allBtn.disabled = !hasSelection;
+            if (validBtn) validBtn.disabled = !hasSelection;
         }
 
         function syncSelectAllCheckbox() {

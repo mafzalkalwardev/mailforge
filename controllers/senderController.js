@@ -58,16 +58,53 @@ const updateSender = async (req, res) => {
         const sender = await SenderAccount.findOne({ _id: req.params.id, user: req.user._id });
         if (!sender) return res.status(404).json({ message: 'Sender not found' });
 
-        const { displayName, appPassword, smtpHost, smtpPort, imapHost, imapPort, dailyLimit, enabled, warmupEnabled } = req.body;
+        const {
+            email,
+            displayName,
+            appPassword,
+            smtpHost,
+            smtpPort,
+            imapHost,
+            imapPort,
+            dailyLimit,
+            enabled,
+            warmupEnabled,
+            warmupDay,
+            sentToday,
+            resetSentToday,
+        } = req.body;
+
+        if (email !== undefined) {
+            const nextEmail = String(email).toLowerCase().trim();
+            if (!nextEmail || !nextEmail.includes('@')) {
+                return res.status(400).json({ message: 'Valid email is required' });
+            }
+            if (nextEmail !== sender.email) {
+                const existing = await SenderAccount.findOne({
+                    user: req.user._id,
+                    email: nextEmail,
+                    _id: { $ne: sender._id },
+                });
+                if (existing) return res.status(409).json({ message: 'Another sender already uses this email' });
+                sender.email = nextEmail;
+            }
+        }
+
         if (displayName !== undefined) sender.displayName = displayName;
         if (appPassword) sender.encryptedPassword = encrypt(appPassword);
-        if (smtpHost) sender.smtpHost = smtpHost;
-        if (smtpPort) sender.smtpPort = smtpPort;
-        if (imapHost) sender.imapHost = imapHost;
-        if (imapPort) sender.imapPort = imapPort;
-        if (dailyLimit) sender.dailyLimit = dailyLimit;
+        if (smtpHost !== undefined) sender.smtpHost = String(smtpHost).trim() || 'smtp.gmail.com';
+        if (smtpPort !== undefined) sender.smtpPort = Number(smtpPort) || 465;
+        if (imapHost !== undefined) sender.imapHost = String(imapHost).trim() || 'imap.gmail.com';
+        if (imapPort !== undefined) sender.imapPort = Number(imapPort) || 993;
+        if (dailyLimit !== undefined) sender.dailyLimit = Math.max(1, Number(dailyLimit) || 450);
         if (enabled !== undefined) sender.enabled = enabled;
         if (warmupEnabled !== undefined) sender.warmupEnabled = warmupEnabled;
+        if (warmupDay !== undefined) sender.warmupDay = Math.max(1, Number(warmupDay) || 1);
+        if (sentToday !== undefined) sender.sentToday = Math.max(0, Number(sentToday) || 0);
+        if (resetSentToday === true) {
+            sender.sentToday = 0;
+            sender.lastSendDate = '';
+        }
 
         await sender.save();
         res.json(sanitizeSender(sender));

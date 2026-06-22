@@ -94,6 +94,49 @@
         </div>
     </div>
 
+    <div class="modal fade" id="editSenderModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Edit Sender Account</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" id="editSenderId">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Email / username</label><input type="email" id="editEmail" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Display name</label><input type="text" id="editName" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">New Gmail App Password</label><input type="password" id="editPassword" class="form-control" placeholder="Leave blank to keep current"></div>
+                        <div class="col-md-3"><label class="form-label">Daily limit</label><input type="number" id="editLimit" min="1" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label">Warm-up day</label><input type="number" id="editWarmupDay" min="1" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">SMTP host</label><input type="text" id="editSmtpHost" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label">SMTP port</label><input type="number" id="editSmtpPort" min="1" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">IMAP host</label><input type="text" id="editImapHost" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label">IMAP port</label><input type="number" id="editImapPort" min="1" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label">Sent today</label><input type="number" id="editSentToday" min="0" class="form-control"></div>
+                    </div>
+                    <div class="d-flex gap-4 flex-wrap mt-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="editEnabled">
+                            <label class="form-check-label" for="editEnabled">Enabled</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="editWarmupEnabled">
+                            <label class="form-check-label" for="editWarmupEnabled">Warm-up enabled</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editResetSentToday">
+                            <label class="form-check-label" for="editResetSentToday">Reset today's send count</label>
+                        </div>
+                    </div>
+                    <p class="small text-muted mt-3 mb-0">Changing the email updates the sender username used for SMTP/IMAP. Enter a new app password only when you want to replace the saved one.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="resetGmailDefaultsBtn">Gmail defaults</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="updateSenderBtn">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="testSendModal" tabindex="-1">
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
@@ -117,10 +160,41 @@
     <script src="/js/confirm-modal.js"></script>
     <script src="/js/main.js"></script>
     <script>
+        let sendersById = new Map();
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            }[ch]));
+        }
+
+        function openEditSender(sender) {
+            document.getElementById('editSenderId').value = sender._id;
+            document.getElementById('editEmail').value = sender.email || '';
+            document.getElementById('editName').value = sender.displayName || '';
+            document.getElementById('editPassword').value = '';
+            document.getElementById('editLimit').value = sender.dailyLimit || 450;
+            document.getElementById('editWarmupDay').value = sender.warmupDay || sender.warmup?.day || 1;
+            document.getElementById('editSmtpHost').value = sender.smtpHost || 'smtp.gmail.com';
+            document.getElementById('editSmtpPort').value = sender.smtpPort || 465;
+            document.getElementById('editImapHost').value = sender.imapHost || 'imap.gmail.com';
+            document.getElementById('editImapPort').value = sender.imapPort || 993;
+            document.getElementById('editSentToday').value = sender.sentToday || sender.warmup?.sentToday || 0;
+            document.getElementById('editEnabled').checked = sender.enabled !== false;
+            document.getElementById('editWarmupEnabled').checked = sender.warmupEnabled !== false;
+            document.getElementById('editResetSentToday').checked = false;
+            new bootstrap.Modal(document.getElementById('editSenderModal')).show();
+        }
+
         async function loadSenders() {
             const el = document.getElementById('sendersList');
             try {
                 const res = await axios.get('/api/senders');
+                sendersById = new Map((res.data || []).map(sender => [sender._id, sender]));
                 if (!res.data.length) {
                     el.innerHTML = '<p class="text-muted mb-0">No sender accounts yet. Add one or bulk import a CSV.</p>';
                     return;
@@ -132,11 +206,12 @@
                         ? `<span class="badge ${dns.score >= 2 ? 'bg-success' : 'bg-warning text-dark'}">${dns.score || 0}/3</span>`
                         : '<span class="badge bg-secondary">?</span>';
                     return `<tr>
-                    <td><strong>${s.displayName || s.email}</strong><br><small class="text-muted">${s.email}</small><br><small class="text-muted">Day ${w.day || 1}: ${w.sentToday || 0}/${w.limitToday || s.dailyLimit} today</small></td>
+                    <td><strong>${escapeHtml(s.displayName || s.email)}</strong><br><small class="text-muted">${escapeHtml(s.email)}</small><br><small class="text-muted">Day ${w.day || 1}: ${w.sentToday || 0}/${w.limitToday || s.dailyLimit} today</small></td>
                     <td>${w.enabled ? `<span class="badge bg-info text-dark">Day ${w.day}</span>` : '<span class="badge bg-secondary">Off</span>'}</td>
                     <td>${dnsBadge}</td>
                     <td><span class="badge ${s.enabled ? 'bg-success' : 'bg-secondary'}">${s.enabled ? 'Enabled' : 'Disabled'}</span></td>
                     <td><div class="btn-group btn-group-sm flex-wrap">
+                        <button class="btn btn-outline-primary edit-btn" data-id="${s._id}"><i class="fa-solid fa-pen-to-square"></i></button>
                         <button class="btn btn-outline-primary test-btn" data-id="${s._id}">SMTP</button>
                         <button class="btn btn-outline-secondary dns-btn" data-id="${s._id}">DNS</button>
                         <button class="btn btn-outline-success send-test-btn" data-id="${s._id}">Test send</button>
@@ -149,6 +224,10 @@
                         await axios.post(`/api/senders/${btn.dataset.id}/test`);
                         showToast('SMTP connection OK', 'success');
                     } catch (e) { showToast(e.response?.data?.message || 'Test failed', 'error'); }
+                }));
+                el.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', () => {
+                    const sender = sendersById.get(btn.dataset.id);
+                    if (sender) openEditSender(sender);
                 }));
                 el.querySelectorAll('.dns-btn').forEach(btn => btn.addEventListener('click', async () => {
                     try {
@@ -193,6 +272,42 @@
                 loadSenders();
             } catch (e) {
                 showToast(e.response?.data?.message || 'Failed to add sender', 'error');
+            }
+        });
+
+        document.getElementById('resetGmailDefaultsBtn').addEventListener('click', () => {
+            document.getElementById('editSmtpHost').value = 'smtp.gmail.com';
+            document.getElementById('editSmtpPort').value = 465;
+            document.getElementById('editImapHost').value = 'imap.gmail.com';
+            document.getElementById('editImapPort').value = 993;
+        });
+
+        document.getElementById('updateSenderBtn').addEventListener('click', async () => {
+            const id = document.getElementById('editSenderId').value;
+            const password = document.getElementById('editPassword').value.trim();
+            const payload = {
+                email: document.getElementById('editEmail').value,
+                displayName: document.getElementById('editName').value,
+                dailyLimit: Number(document.getElementById('editLimit').value),
+                warmupDay: Number(document.getElementById('editWarmupDay').value),
+                smtpHost: document.getElementById('editSmtpHost').value,
+                smtpPort: Number(document.getElementById('editSmtpPort').value),
+                imapHost: document.getElementById('editImapHost').value,
+                imapPort: Number(document.getElementById('editImapPort').value),
+                sentToday: Number(document.getElementById('editSentToday').value),
+                enabled: document.getElementById('editEnabled').checked,
+                warmupEnabled: document.getElementById('editWarmupEnabled').checked,
+                resetSentToday: document.getElementById('editResetSentToday').checked,
+            };
+            if (password) payload.appPassword = password;
+
+            try {
+                await axios.put(`/api/senders/${id}`, payload);
+                bootstrap.Modal.getInstance(document.getElementById('editSenderModal')).hide();
+                showToast('Sender updated', 'success');
+                loadSenders();
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Failed to update sender', 'error');
             }
         });
 

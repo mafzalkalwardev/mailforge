@@ -251,7 +251,18 @@ function buildRecentResults(job, limit = 30) {
 
 function buildAllRows(job) {
     return (job.fileRows || []).map(fr => {
-        const r = job.resultsByEmail[fr.email] || {};
+        const r = job.resultsByEmail[fr.email];
+        if (!r) {
+            return {
+                email: fr.email,
+                originalRow: fr.originalRow || [],
+                valid: false,
+                domain_valid: false,
+                mailbox_verified: '',
+                smtp_response: '',
+                status: 'pending',
+            };
+        }
         return resultToRow(r, fr);
     });
 }

@@ -49,4 +49,38 @@ describe('bulkJobUtils', () => {
         assert.match(csv, /yes/);
         assert.match(csv, /250 OK/);
     });
+
+    it('rowsToCsv preserves original columns before appended verification columns', () => {
+        const headers = ['MC Number', 'Legal Name', 'States', 'Address', 'Phone', 'Email'];
+        const csv = rowsToCsv(headers, [{
+            email: 'arborists22@gmail.com',
+            originalRow: ['MC-1778293', 'C&D PRIME LOGISTICS LLC', 'AL', '275 FORESTDALE DR OXFORD, AL 36203', '(256) 294-6377', 'ARBORISTS22@GMAIL.COM'],
+            valid: true,
+            domain_valid: true,
+            mailbox_verified: 'yes',
+            smtp_response: '250 OK',
+            status: 'valid',
+        }]);
+
+        const [headerLine, rowLine] = csv.split('\r\n');
+        assert.ok(headerLine.startsWith('"MC Number","Legal Name","States","Address","Phone","Email"'));
+        assert.match(headerLine, /"verification_valid","verification_domain_valid","verification_mailbox_verified","verification_status","verification_smtp_response"$/);
+        assert.ok(rowLine.startsWith('"MC-1778293","C&D PRIME LOGISTICS LLC","AL"'));
+        assert.match(rowLine, /"yes","yes","yes","valid","250 OK"$/);
+    });
+
+    it('rowsToCsv keeps original cells when rows have more columns than headers', () => {
+        const csv = rowsToCsv(['Name'], [{
+            email: 'x@y.com',
+            originalRow: ['Jane', 'Dispatch', 'x@y.com'],
+            valid: false,
+            domain_valid: true,
+            mailbox_verified: 'unknown',
+            status: 'unknown',
+        }]);
+
+        const [headerLine, rowLine] = csv.split('\r\n');
+        assert.ok(headerLine.startsWith('"Name","col_2","col_3"'));
+        assert.ok(rowLine.startsWith('"Jane","Dispatch","x@y.com"'));
+    });
 });

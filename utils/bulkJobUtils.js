@@ -76,23 +76,46 @@ function filterRowsForExport(rows, filter = 'all') {
     return rows || [];
 }
 
+function buildOriginalHeaders(headers, rows) {
+    const maxCols = Math.max(
+        Array.isArray(headers) ? headers.length : 0,
+        ...(rows || []).map(row => (row.originalRow || []).length),
+        0
+    );
+
+    if (!maxCols) return ['email'];
+
+    return Array.from({ length: maxCols }, (_, i) => {
+        const header = Array.isArray(headers) ? String(headers[i] || '').trim() : '';
+        return header || `col_${i + 1}`;
+    });
+}
+
 function rowsToCsv(headers, rows) {
-    const hdrs = Array.isArray(headers) && headers.length
-        ? [...headers, 'valid', 'mailbox_verified', 'smtp_response', 'status']
-        : ['email', 'valid', 'mailbox_verified', 'smtp_response', 'status'];
+    const originalHeaders = buildOriginalHeaders(headers, rows);
+    const hasOriginalRows = (rows || []).some(row => (row.originalRow || []).length);
+    const hdrs = [
+        ...originalHeaders,
+        'verification_valid',
+        'verification_domain_valid',
+        'verification_mailbox_verified',
+        'verification_status',
+        'verification_smtp_response',
+    ];
 
     const lines = [hdrs.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',')];
     for (const row of rows) {
-        const base = Array.isArray(row.originalRow) && headers?.length
-            ? headers.map((_, i) => row.originalRow[i] ?? '')
+        const base = hasOriginalRows
+            ? originalHeaders.map((_, i) => row.originalRow?.[i] ?? '')
             : [row.email || ''];
         const extra = [
             row.valid ? 'yes' : 'no',
+            row.domain_valid ? 'yes' : 'no',
             row.mailbox_verified || '',
-            (row.smtp_response || '').replace(/\r?\n/g, ' '),
             row.status || '',
+            (row.smtp_response || '').replace(/\r?\n/g, ' '),
         ];
-        const cells = [...base, ...extra].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`);
+        const cells = [...base, ...extra].map(v => `"${String(v ?? '').replace(/\r?\n/g, ' ').replace(/"/g, '""')}"`);
         lines.push(cells.join(','));
     }
     return lines.join('\r\n');
@@ -100,6 +123,7 @@ function rowsToCsv(headers, rows) {
 
 module.exports = {
     analyzeListHygiene,
+    buildOriginalHeaders,
     dedupeRows,
     filterRowsForExport,
     rowsToCsv,
