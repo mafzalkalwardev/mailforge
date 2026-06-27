@@ -32,6 +32,9 @@
     "setup:new-pc": "powershell -ExecutionPolicy Bypass -File scripts/setup-new-pc.ps1",
     "fix:readmes": "node scripts/fix-all-readmes.mjs",
     "restore:readmes": "node scripts/restore-readme-screenshots.mjs",
+    "bootstrap:packages": "node scripts/bootstrap-all-packages.mjs",
+    "release:all": "node scripts/trigger-all-releases.mjs",
+    "profile:enhance": "node scripts/enhance-profile-readme.mjs",
     "test": "node --test tests/*.test.js",
     "docker:full": "docker compose -f docker-compose.full.yml up -d",
     "docker:full:down": "docker compose -f docker-compose.full.yml down"
