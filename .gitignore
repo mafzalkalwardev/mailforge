@@ -33,3 +33,7 @@ Thumbs.db
 # Test artifacts
 coverage/
 *.test
+
+*.xlsx
+*.csv
+!sample.csv
