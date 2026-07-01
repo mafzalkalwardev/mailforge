@@ -1,0 +1,30 @@
+MailForge Portable Package Contents
+===================================
+
+This folder is prepared to run MailForge without Docker or online MongoDB.
+
+Keep these folders/files together when copying MailForge to another PC:
+
+- MailForge.exe
+- package.json
+- node_modules/
+- backend/go/verifier.exe
+- tools/mongodb-binaries/
+- data/mongodb/
+- .env
+
+Portable MongoDB engine:
+tools/mongodb-binaries/
+
+Portable MongoDB data:
+data/mongodb/
+
+Local verifier engine:
+backend/go/verifier.exe
+
+Start the app:
+Double-click MailForge.exe
+
+Important:
+Do not delete data/mongodb unless you want to remove saved users, senders,
+campaigns, inbox data, and verification history.
