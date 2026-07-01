@@ -2,14 +2,16 @@ const { spawn } = require('child_process');
 const path = require('path');
 const axios = require('axios');
 
-const GO_BASE = process.env.GO_VERIFIER_URL || 'http://localhost:8082';
-
 let goProcess = null;
 let startPromise = null;
 
+function goBase() {
+    return process.env.GO_VERIFIER_URL || 'http://localhost:8082';
+}
+
 function isLocalGoUrl() {
     try {
-        const url = new URL(GO_BASE);
+        const url = new URL(goBase());
         return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     } catch {
         return false;
@@ -18,7 +20,7 @@ function isLocalGoUrl() {
 
 function goPortFromEnv() {
     try {
-        const url = new URL(GO_BASE);
+        const url = new URL(goBase());
         return url.port || '8082';
     } catch {
         return '8082';
@@ -27,7 +29,7 @@ function goPortFromEnv() {
 
 async function isGoHealthy() {
     try {
-        const { data } = await axios.get(`${GO_BASE}/health`, { timeout: 3000 });
+        const { data } = await axios.get(`${goBase()}/health`, { timeout: 3000 });
         return data?.status === 'ok';
     } catch {
         return false;
@@ -53,7 +55,7 @@ async function ensureGoVerifier() {
             for (let i = 0; i < 20; i++) {
                 await new Promise(r => setTimeout(r, 500));
                 if (await isGoHealthy()) {
-                    console.log('✅ truemail-go ready at', GO_BASE);
+                    console.log('✅ truemail-go ready at', goBase());
                     return;
                 }
             }
@@ -81,7 +83,7 @@ async function ensureGoVerifier() {
         for (let i = 0; i < 45; i++) {
             await new Promise(r => setTimeout(r, 1000));
             if (await isGoHealthy()) {
-                console.log('✅ truemail-go ready at', GO_BASE);
+                console.log('✅ truemail-go ready at', goBase());
                 return;
             }
         }
