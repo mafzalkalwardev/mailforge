@@ -3,29 +3,47 @@ function fileBaseName(fileName) {
     return String(fileName).replace(/\.[^.]+$/, '') || 'email_verification';
 }
 
-function buildVerificationCsv(rows, validOnly) {
-    const filtered = validOnly ? rows.filter(r => r.valid) : rows;
+function escapeCsvCell(value) {
+    return `"${String(value ?? '').replace(/\r?\n/g, ' ').replace(/"/g, '""')}"`;
+}
+
+function originalHeaders(headers, rows) {
+    const given = Array.isArray(headers) ? headers : [];
+    const maxCols = Math.max(given.length, ...rows.map(r => (r.originalRow || []).length), 0);
+    if (!maxCols) return ['email'];
+    return Array.from({ length: maxCols }, (_, i) => String(given[i] || '').trim() || `col_${i + 1}`);
+}
+
+function buildVerificationCsv(rows, validOnly, headers = []) {
+    const filtered = (validOnly ? rows.filter(r => r.valid) : rows).filter(r => r.status !== 'pending');
     if (!filtered.length) return '';
 
-    const maxCols = Math.max(...filtered.map(r => (r.originalRow || []).length), 0);
-    const origHeaders = Array.from({ length: maxCols }, (_, i) => `col_${i + 1}`);
-    const header = ['valid', 'mailbox_verified', 'domain_valid', 'email', ...origHeaders, 'smtp_response'].join(',');
+    const origHeaders = originalHeaders(headers, filtered);
+    const hasOriginalRows = filtered.some(r => (r.originalRow || []).length);
+    const header = [
+        ...origHeaders,
+        'verification_valid',
+        'verification_domain_valid',
+        'verification_mailbox_verified',
+        'verification_status',
+        'verification_smtp_response',
+    ].map(escapeCsvCell).join(',');
     const lines = [header];
 
     filtered.forEach(r => {
         const orig = r.originalRow || [];
-        const padded = origHeaders.map((_, i) => `"${String(orig[i] || '').replace(/"/g, '""')}"`);
+        const base = hasOriginalRows ? origHeaders.map((_, i) => orig[i] || '') : [r.email || ''];
         lines.push([
+            ...base,
             r.valid ? 'yes' : 'no',
-            r.mailbox_verified || 'no_smtp',
             r.domain_valid ? 'yes' : 'no',
-            `"${r.email}"`,
-            ...padded,
-            `"${String(r.smtp_response || '').replace(/"/g, '""')}"`,
-        ].join(','));
+            r.mailbox_verified || '',
+            r.status || '',
+            r.smtp_response || '',
+        ].map(escapeCsvCell).join(','));
     });
 
-    return lines.join('\n');
+    return lines.join('\r\n');
 }
 
 function downloadCsv(content, name) {
@@ -40,7 +58,7 @@ function downloadCsv(content, name) {
 
 function exportJobCsv(job, validOnly) {
     const rows = job.rows || [];
-    const csv = buildVerificationCsv(rows, validOnly);
+    const csv = buildVerificationCsv(rows, validOnly, job.headers || []);
     if (!csv) return false;
 
     const base = fileBaseName(job.fileName);

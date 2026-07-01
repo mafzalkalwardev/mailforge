@@ -30,7 +30,10 @@
                     <h2 class="fw-bold mb-1">Unified Inbox</h2>
                     <p class="text-muted mb-0"><span id="inboxStats">Loading...</span></p>
                 </div>
-                <button class="btn btn-outline-primary" id="syncBtn"><i class="fa-solid fa-rotate me-2"></i>Sync Now</button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" id="markAllReadBtn"><i class="fa-solid fa-envelope-open me-2"></i>Mark all read</button>
+                    <button class="btn btn-outline-primary" id="syncBtn"><i class="fa-solid fa-rotate me-2"></i>Sync Now</button>
+                </div>
             </div>
 
             <div class="row g-4">
@@ -43,6 +46,7 @@
                         <div class="inbox-filter-bar">
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn active" data-filter="all">All</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="unread"><i class="fa-solid fa-envelope me-1"></i>Unread</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="sent"><i class="fa-solid fa-paper-plane me-1"></i>Sent</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="starred"><i class="fa-solid fa-star me-1"></i>Starred</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary inbox-filter-btn" data-filter="important"><i class="fa-solid fa-circle-exclamation me-1"></i>Important</button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="threadToggleBtn" title="Group by conversation"><i class="fa-solid fa-comments me-1"></i>Threads</button>
@@ -116,14 +120,14 @@
             const params = selectedAccount ? { account: selectedAccount } : {};
             const res = await axios.get('/api/inbox/stats', { params });
             document.getElementById('inboxStats').textContent =
-                `${res.data.total} messages · ${res.data.unread} unread · ${res.data.starred} starred · ${res.data.important} important · ${res.data.campaignReplies} campaign replies`;
+                `${res.data.total} messages | ${res.data.unread} unread | ${res.data.sent || 0} sent | ${res.data.starred} starred | ${res.data.important} important | ${res.data.campaignReplies} campaign replies`;
         }
 
         async function loadMessages(q = '') {
             const params = { q, limit: 100 };
             if (selectedAccount) params.account = selectedAccount;
             if (activeFilter !== 'all') params.filter = activeFilter;
-            if (threadMode) params.threads = '1';
+            if (threadMode && activeFilter !== 'sent') params.threads = '1';
             const res = await axios.get('/api/inbox', { params });
             messages = res.data.messages;
             const list = document.getElementById('messageList');
@@ -133,11 +137,11 @@
             }
             list.innerHTML = messages.map(m => `<button type="button" class="list-group-item list-group-item-action text-start border-0 rounded mb-1 ${m.isRead ? '' : 'fw-semibold'} msg-item" data-id="${m._id}">
                 <div class="d-flex justify-content-between gap-2 align-items-start">
-                    <span class="text-truncate">${m.from || 'Unknown'}${iconRow(m)}</span>
+                    <span class="text-truncate">${m.folder === 'sent' ? `To: ${m.to || 'Unknown'}` : (m.from || 'Unknown')}${iconRow(m)}</span>
                     <small class="text-muted flex-shrink-0">${new Date(m.receivedAt).toLocaleDateString()}${m.threadCount > 1 ? ` · ${m.threadCount}` : ''}</small>
                 </div>
                 <div class="small text-truncate">${m.subject || '(no subject)'}</div>
-                <div class="d-flex gap-1 flex-wrap">${!selectedAccount ? accountLabel(m) : ''}${m.campaign ? '<span class="badge bg-info text-dark mt-1">Campaign reply</span>' : ''}${m.isBounce ? '<span class="badge bg-danger mt-1">Bounce</span>' : ''}${m.leadTag && m.leadTag !== 'none' ? `<span class="badge bg-primary mt-1">${m.leadTag.replace('_', ' ')}</span>` : ''}</div>
+                <div class="d-flex gap-1 flex-wrap">${m.folder === 'sent' ? '<span class="badge bg-success mt-1">Sent</span>' : ''}${!selectedAccount ? accountLabel(m) : ''}${m.campaign ? `<span class="badge bg-info text-dark mt-1">${m.folder === 'sent' ? 'Campaign sent' : 'Campaign reply'}</span>` : ''}${m.isBounce ? '<span class="badge bg-danger mt-1">Bounce</span>' : ''}${m.leadTag && m.leadTag !== 'none' ? `<span class="badge bg-primary mt-1">${m.leadTag.replace('_', ' ')}</span>` : ''}</div>
             </button>`).join('');
 
             list.querySelectorAll('.msg-item').forEach(btn => btn.addEventListener('click', () => showMessage(btn.dataset.id)));
@@ -149,18 +153,43 @@
                 const parts = body.split(/\r?\n\r?\n/);
                 if (parts.length > 1) body = parts.slice(1).join('\n\n');
             }
+            body = decodeQuotedPrintable(body);
             return body.slice(0, 20000);
+        }
+
+        function decodeQuotedPrintable(value) {
+            let text = String(value || '').replace(/=\r?\n/g, '');
+            if (!/=([0-9A-F]{2})/i.test(text)) return text;
+            try {
+                const bytes = text.replace(/=([0-9A-F]{2})/gi, (_, hex) =>
+                    String.fromCharCode(parseInt(hex, 16))
+                );
+                return decodeURIComponent(escape(bytes));
+            } catch (_) {
+                return text.replace(/=([0-9A-F]{2})/gi, (_, hex) =>
+                    String.fromCharCode(parseInt(hex, 16))
+                );
+            }
         }
 
         async function showMessage(id) {
             const res = await axios.get(`/api/inbox/${id}`);
             const m = res.data;
             currentMessageId = id;
-            await axios.post(`/api/inbox/${id}/read`);
+            if (m.folder !== 'sent') await axios.post(`/api/inbox/${id}/read`);
             const sa = m.senderAccount;
             const accountLine = sa
                 ? `<strong>Account:</strong> ${sa.displayName || sa.email?.split('@')[0]} &lt;${sa.email}&gt;<br>`
                 : '';
+            if (m.folder === 'sent') {
+                document.getElementById('messageDetail').innerHTML = `
+                <div class="mb-3">${accountLine}<strong>From:</strong> ${m.from || ''}<br><strong>To:</strong> ${m.to || ''}<br><strong>Sent:</strong> ${new Date(m.sentAt || m.receivedAt).toLocaleString()}</div>
+                <h5>${m.subject || '(no subject)'}</h5>
+                ${m.campaign ? `<p class="small"><span class="badge bg-info text-dark">Campaign: ${m.campaign.name || ''}</span></p>` : ''}
+                <hr>
+                <pre class="small mb-0" id="msgBody" style="white-space: pre-wrap; font-family: inherit;">${displayBody(m) || 'Sent body was not saved for this older message.'}</pre>`;
+                return;
+            }
             document.getElementById('messageDetail').innerHTML = `
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                     <div>${accountLine}<strong>From:</strong> ${m.from}<br><strong>To:</strong> ${m.to}<br><strong>Date:</strong> ${new Date(m.receivedAt).toLocaleString()}</div>
@@ -239,6 +268,7 @@
         document.getElementById('threadToggleBtn').addEventListener('click', async () => {
             threadMode = !threadMode;
             document.getElementById('threadToggleBtn').classList.toggle('active', threadMode);
+            if (activeFilter === 'sent') showToast('Threads apply to inbox messages only', 'info');
             await loadMessages(document.getElementById('searchInput').value);
         });
 
@@ -270,6 +300,22 @@
                 showToast(e.response?.data?.message || 'Sync failed', 'error');
             } finally {
                 document.getElementById('syncBtn').disabled = false;
+            }
+        });
+
+        document.getElementById('markAllReadBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('markAllReadBtn');
+            btn.disabled = true;
+            try {
+                const payload = selectedAccount ? { senderAccountId: selectedAccount } : {};
+                const res = await axios.post('/api/inbox/read-all', payload);
+                showToast(res.data.message || 'Marked all read', 'success');
+                await loadMessages(document.getElementById('searchInput').value);
+                await loadStats();
+            } catch (e) {
+                showToast(e.response?.data?.message || 'Failed to mark read', 'error');
+            } finally {
+                btn.disabled = false;
             }
         });
 

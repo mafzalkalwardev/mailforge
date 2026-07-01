@@ -127,7 +127,7 @@ const createFromBulkJob = async (req, res) => {
                 retries: settings?.retries ?? 2,
                 maxPerSender: settings?.maxPerSender ?? 450,
                 warmUp: settings?.warmUp !== false,
-                appendUnsubscribe: settings?.appendUnsubscribe !== false,
+                appendUnsubscribe: settings?.appendUnsubscribe === true,
             },
             recipients,
             status: scheduledAt && new Date(scheduledAt) > new Date() ? 'scheduled' : 'draft',

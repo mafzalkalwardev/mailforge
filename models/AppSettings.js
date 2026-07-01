@@ -11,7 +11,7 @@ const AppSettingsSchema = new mongoose.Schema(
         verifierEngine: {
             type: String,
             enum: ['auto', 'truemail', 'reacher'],
-            default: 'auto',
+            default: 'truemail',
         },
         goVerifierUrl: {
             type: String,

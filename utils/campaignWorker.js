@@ -53,6 +53,186 @@ function splitRecipientsEvenly(recipients, numSenders) {
     return chunks;
 }
 
+async function isCampaignStillRunning(campaignId) {
+    return Boolean(await Campaign.exists({ _id: campaignId, status: 'running' }));
+}
+
+async function updateRecipientStatus(campaignId, recipientId, status, fields = {}) {
+    const update = {
+        $set: {
+            'recipients.$.status': status,
+            ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [`recipients.$.${key}`, value])),
+        },
+        $inc: {
+            'stats.pending': -1,
+            [`stats.${status}`]: 1,
+        },
+    };
+
+    const result = await Campaign.updateOne(
+        { _id: campaignId, 'recipients._id': recipientId, 'recipients.status': 'pending' },
+        update
+    );
+    return result.modifiedCount > 0;
+}
+
+async function pauseCampaignWithError(campaignId, message) {
+    await Campaign.updateOne(
+        { _id: campaignId, status: 'running' },
+        { $set: { status: 'paused', lastError: message } }
+    );
+}
+
+async function warmUpSenders(senders, abort) {
+    await Promise.all(senders.map(async sender => {
+        if (abort.cancelled) return;
+        try {
+            await sendWarmUp(sender);
+            await sleep(randomDelay(30000, 60000));
+        } catch (err) {
+            console.warn(`Warm-up failed for ${sender.email}:`, err.message);
+        }
+    }));
+}
+
+async function sendRecipientForSender({
+    campaignId,
+    campaignSnapshot,
+    userSettings,
+    maxPerHour,
+    failurePausePct,
+    sender,
+    senderCounts,
+    recipientRef,
+    abort,
+}) {
+    if (abort.cancelled) return;
+    if (!(await isCampaignStillRunning(campaignId))) {
+        abort.cancelled = true;
+        return;
+    }
+
+    const recipientId = recipientRef._id;
+    const userId = String(campaignSnapshot.user);
+
+    if (await isSuppressed(campaignSnapshot.user, recipientRef.email)) {
+        await updateRecipientStatus(campaignId, recipientId, 'skipped', {
+            error: 'On suppression list',
+        });
+        return;
+    }
+
+    if (maxPerHour > 0 && getHourlySendCount(userId) >= maxPerHour) {
+        await updateRecipientStatus(campaignId, recipientId, 'skipped', {
+            error: 'Hourly send limit reached',
+        });
+        await pauseCampaignWithError(campaignId, `Paused: hourly limit of ${maxPerHour} sends reached`);
+        abort.cancelled = true;
+        return;
+    }
+
+    const maxPerSender = campaignSnapshot.settings?.maxPerSender || 450;
+    if ((senderCounts.get(String(sender._id)) || 0) >= maxPerSender) {
+        await updateRecipientStatus(campaignId, recipientId, 'skipped', {
+            error: 'Sender daily limit reached',
+        });
+        return;
+    }
+
+    const sendCap = await canSenderSendToday(sender._id);
+    if (!sendCap.ok) {
+        await updateRecipientStatus(campaignId, recipientId, 'skipped', {
+            error: sendCap.reason,
+        });
+        return;
+    }
+
+    const row = { Email: recipientRef.email, ...(recipientRef.rowData || {}) };
+    const { subject, body } = renderCampaignEmail(campaignSnapshot, row, sender, {
+        userId: campaignSnapshot.user,
+        appendCanSpamFooter: userSettings.appendCanSpamFooter,
+        canSpamAddress: userSettings.canSpamAddress,
+    });
+
+    let lastError = '';
+    const retries = campaignSnapshot.settings?.retries ?? 2;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        if (abort.cancelled) return;
+        try {
+            const messageId = await sendCampaignMessage(sender, recipientRef.email, subject, body);
+            const updated = await updateRecipientStatus(campaignId, recipientId, 'sent', {
+                subject,
+                body,
+                senderEmail: sender.email,
+                messageId,
+                sentAt: new Date(),
+                error: '',
+            });
+            if (updated) {
+                senderCounts.set(String(sender._id), (senderCounts.get(String(sender._id)) || 0) + 1);
+                trackHourlySend(userId);
+                await recordSenderSend(sender._id);
+            }
+            return;
+        } catch (err) {
+            lastError = err.message;
+            if (attempt < retries) await sleep(3000);
+        }
+    }
+
+    await updateRecipientStatus(campaignId, recipientId, 'failed', {
+        error: lastError || 'Send failed',
+    });
+
+    const sk = `${campaignSnapshot.user}:${sender.email}`;
+    const fails = (senderFailureCounts.get(sk) || 0) + 1;
+    senderFailureCounts.set(sk, fails);
+    const sentBySender = senderCounts.get(String(sender._id)) || 0;
+    const failRate = sentBySender + fails > 0 ? (fails / (sentBySender + fails)) * 100 : 100;
+    if (failRate >= failurePausePct && fails >= 3) {
+        await pauseCampaignWithError(campaignId, `Paused: ${sender.email} failure rate ${Math.round(failRate)}%`);
+        abort.cancelled = true;
+    }
+    if (looksLikeBounce(lastError)) {
+        try {
+            await addSuppression(campaignSnapshot.user, recipientRef.email, 'bounce', lastError.slice(0, 200));
+        } catch (_) {}
+    }
+}
+
+async function runSenderLane({
+    campaignId,
+    campaignSnapshot,
+    userSettings,
+    maxPerHour,
+    failurePausePct,
+    sender,
+    chunk,
+    senderCounts,
+    abort,
+}) {
+    for (const recipientRef of chunk) {
+        if (abort.cancelled) break;
+        await sendRecipientForSender({
+            campaignId,
+            campaignSnapshot,
+            userSettings,
+            maxPerHour,
+            failurePausePct,
+            sender,
+            senderCounts,
+            recipientRef,
+            abort,
+        });
+        if (!abort.cancelled) {
+            await sleep(randomDelay(
+                campaignSnapshot.settings?.minDelayMs || 5000,
+                campaignSnapshot.settings?.maxDelayMs || 15000
+            ));
+        }
+    }
+}
+
 async function runCampaignWorker(campaignId) {
     if (activeWorkers.get(String(campaignId))) return;
 
@@ -89,125 +269,20 @@ async function runCampaignWorker(campaignId) {
         const senderCounts = new Map(senders.map(s => [String(s._id), 0]));
 
         if (campaign.settings?.warmUp) {
-            for (const sender of senders) {
-                if (abort.cancelled) break;
-                try {
-                    await sendWarmUp(sender);
-                    await sleep(randomDelay(30000, 60000));
-                } catch (err) {
-                    console.warn(`Warm-up failed for ${sender.email}:`, err.message);
-                }
-            }
+            await warmUpSenders(senders, abort);
         }
 
-        for (let si = 0; si < senders.length; si++) {
-            const sender = senders[si];
-            const chunk = chunks[si] || [];
-            const maxPerSender = campaign.settings?.maxPerSender || 450;
-            const retries = campaign.settings?.retries ?? 2;
-
-            for (const recipientRef of chunk) {
-                if (abort.cancelled) break;
-
-                campaign = await Campaign.findById(campaignId);
-                if (!campaign || campaign.status !== 'running') break;
-
-                const recipient = campaign.recipients.id(recipientRef._id);
-                if (!recipient || recipient.status !== 'pending') continue;
-
-                if (await isSuppressed(campaign.user, recipient.email)) {
-                    recipient.status = 'skipped';
-                    recipient.error = 'On suppression list';
-                    recomputeStats(campaign);
-                    await campaign.save();
-                    continue;
-                }
-
-                if (maxPerHour > 0 && getHourlySendCount(String(campaign.user)) >= maxPerHour) {
-                    recipient.status = 'skipped';
-                    recipient.error = 'Hourly send limit reached';
-                    recomputeStats(campaign);
-                    await campaign.save();
-                    campaign.status = 'paused';
-                    campaign.lastError = `Paused: hourly limit of ${maxPerHour} sends reached`;
-                    await campaign.save();
-                    abort.cancelled = true;
-                    break;
-                }
-
-                if ((senderCounts.get(String(sender._id)) || 0) >= maxPerSender) {
-                    recipient.status = 'skipped';
-                    recipient.error = 'Sender daily limit reached';
-                    recomputeStats(campaign);
-                    await campaign.save();
-                    continue;
-                }
-
-                const sendCap = await canSenderSendToday(sender._id);
-                if (!sendCap.ok) {
-                    recipient.status = 'skipped';
-                    recipient.error = sendCap.reason;
-                    recomputeStats(campaign);
-                    await campaign.save();
-                    continue;
-                }
-
-                const row = { Email: recipient.email, ...(recipient.rowData || {}) };
-                const { subject, body } = renderCampaignEmail(campaign, row, sender, {
-                    userId: campaign.user,
-                    appendCanSpamFooter: userSettings.appendCanSpamFooter,
-                    canSpamAddress: userSettings.canSpamAddress,
-                });
-
-                let success = false;
-                let lastError = '';
-                for (let attempt = 0; attempt <= retries; attempt++) {
-                    try {
-                        const messageId = await sendCampaignMessage(sender, recipient.email, subject, body);
-                        recipient.status = 'sent';
-                        recipient.subject = subject;
-                        recipient.senderEmail = sender.email;
-                        recipient.messageId = messageId;
-                        recipient.sentAt = new Date();
-                        recipient.error = '';
-                        success = true;
-                        senderCounts.set(String(sender._id), (senderCounts.get(String(sender._id)) || 0) + 1);
-                        trackHourlySend(String(campaign.user));
-                        await recordSenderSend(sender._id);
-                        break;
-                    } catch (err) {
-                        lastError = err.message;
-                        if (attempt < retries) await sleep(3000);
-                    }
-                }
-
-                if (!success) {
-                    recipient.status = 'failed';
-                    recipient.error = lastError || 'Send failed';
-                    const sk = `${campaign.user}:${sender.email}`;
-                    const fails = (senderFailureCounts.get(sk) || 0) + 1;
-                    senderFailureCounts.set(sk, fails);
-                    const sentBySender = senderCounts.get(String(sender._id)) || 0;
-                    const failRate = sentBySender + fails > 0 ? (fails / (sentBySender + fails)) * 100 : 100;
-                    if (failRate >= failurePausePct && fails >= 3) {
-                        campaign.lastError = `Paused: ${sender.email} failure rate ${Math.round(failRate)}%`;
-                        campaign.status = 'paused';
-                        await campaign.save();
-                        abort.cancelled = true;
-                    }
-                    if (looksLikeBounce(lastError)) {
-                        try {
-                            await addSuppression(campaign.user, recipient.email, 'bounce', lastError.slice(0, 200));
-                        } catch (_) {}
-                    }
-                }
-
-                recomputeStats(campaign);
-                await campaign.save();
-
-                await sleep(randomDelay(campaign.settings?.minDelayMs || 5000, campaign.settings?.maxDelayMs || 15000));
-            }
-        }
+        await Promise.all(senders.map((sender, si) => runSenderLane({
+            campaignId,
+            campaignSnapshot: campaign,
+            userSettings,
+            maxPerHour,
+            failurePausePct,
+            sender,
+            chunk: chunks[si] || [],
+            senderCounts,
+            abort,
+        })));
 
         campaign = await Campaign.findById(campaignId);
         if (campaign && campaign.status === 'running') {

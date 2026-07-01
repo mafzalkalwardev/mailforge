@@ -1,5 +1,6 @@
 const InboxMessage = require('../models/InboxMessage');
 const SenderAccount = require('../models/SenderAccount');
+const Campaign = require('../models/Campaign');
 const { syncAllAccounts, syncSenderAccount } = require('../utils/imapSync');
 const { sendReplyMessage } = require('../utils/smtpClient');
 const { addSuppression } = require('../utils/suppressionService');
@@ -26,10 +27,113 @@ function applyInboxFilter(filter, filterType) {
     return filter;
 }
 
+function addInboxFolderFilter(filter) {
+    filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ folder: 'inbox' }, { folder: { $exists: false } }] },
+    ];
+    return filter;
+}
+
+function sentMessageId(campaignId, recipientId) {
+    return `sent:${campaignId}:${recipientId}`;
+}
+
+function toSentMessage(campaign, recipient, senderAccount = null) {
+    return {
+        _id: sentMessageId(campaign._id, recipient._id),
+        folder: 'sent',
+        campaign: { _id: campaign._id, name: campaign.name },
+        senderAccount,
+        from: recipient.senderEmail || '',
+        to: recipient.email,
+        subject: recipient.subject || '(no subject)',
+        bodyPreview: recipient.body ? String(recipient.body).slice(0, 250) : '',
+        body: recipient.body || '',
+        isRead: true,
+        isStarred: false,
+        isImportant: false,
+        isBounce: false,
+        leadTag: 'none',
+        messageId: recipient.messageId || '',
+        receivedAt: recipient.sentAt || campaign.updatedAt,
+        sentAt: recipient.sentAt || campaign.updatedAt,
+    };
+}
+
+async function listSentMessages(req, res) {
+    const { account, campaign, q, limit = 50, offset = 0 } = req.query;
+    const sender = account
+        ? await SenderAccount.findOne({ _id: account, user: req.user._id }).select('email displayName')
+        : null;
+    if (account && !sender) return res.json({ messages: [], total: 0, folder: 'sent' });
+
+    const campaigns = await Campaign.find({
+        user: req.user._id,
+        ...(campaign ? { _id: campaign } : {}),
+        'recipients.status': 'sent',
+    }).sort({ updatedAt: -1 });
+
+    const needle = String(q || '').trim().toLowerCase();
+    const sent = [];
+
+    const sentMessageFilter = { user: req.user._id, folder: 'sent' };
+    if (account) sentMessageFilter.senderAccount = account;
+    if (campaign) sentMessageFilter.campaign = campaign;
+    if (q) {
+        sentMessageFilter.$or = [
+            { subject: { $regex: q, $options: 'i' } },
+            { to: { $regex: q, $options: 'i' } },
+            { bodyPreview: { $regex: q, $options: 'i' } },
+            { body: { $regex: q, $options: 'i' } },
+        ];
+    }
+    const savedSent = await InboxMessage.find(sentMessageFilter)
+        .populate('senderAccount', 'email displayName')
+        .populate('campaign', 'name');
+    sent.push(...savedSent.map(m => ({ ...m.toObject(), folder: 'sent', sentAt: m.receivedAt })));
+
+    for (const c of campaigns) {
+        for (const r of c.recipients || []) {
+            if (r.status !== 'sent') continue;
+            if (sender && String(r.senderEmail || '').toLowerCase() !== sender.email.toLowerCase()) continue;
+            if (needle) {
+                const haystack = `${r.email || ''} ${r.senderEmail || ''} ${r.subject || ''} ${r.body || ''}`.toLowerCase();
+                if (!haystack.includes(needle)) continue;
+            }
+            sent.push(toSentMessage(c, r, sender || null));
+        }
+    }
+
+    sent.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+    const start = Math.max(Number(offset) || 0, 0);
+    const end = start + Math.min(Number(limit) || 50, 100);
+    res.json({ messages: sent.slice(start, end), total: sent.length, folder: 'sent' });
+}
+
+async function getSentMessage(req, res) {
+    const [, campaignId, recipientId] = String(req.params.id || '').split(':');
+    if (!campaignId || !recipientId) return res.status(404).json({ message: 'Message not found' });
+
+    const campaign = await Campaign.findOne({ _id: campaignId, user: req.user._id });
+    if (!campaign) return res.status(404).json({ message: 'Message not found' });
+
+    const recipient = campaign.recipients.id(recipientId);
+    if (!recipient || recipient.status !== 'sent') return res.status(404).json({ message: 'Message not found' });
+
+    const sender = recipient.senderEmail
+        ? await SenderAccount.findOne({ user: req.user._id, email: recipient.senderEmail }).select('email displayName')
+        : null;
+    res.json(toSentMessage(campaign, recipient, sender));
+}
+
 const listMessages = async (req, res) => {
     try {
         const { account, campaign, q, filter, threads, limit = 50, offset = 0 } = req.query;
+        if (String(filter || '').toLowerCase() === 'sent') return listSentMessages(req, res);
+
         const filterQuery = applyInboxFilter(accountFilter(req.user._id, account), filter);
+        addInboxFolderFilter(filterQuery);
         if (campaign) filterQuery.campaign = campaign;
         if (q) {
             filterQuery.$or = [
@@ -92,6 +196,8 @@ const listMessages = async (req, res) => {
 
 const getMessage = async (req, res) => {
     try {
+        if (String(req.params.id || '').startsWith('sent:')) return getSentMessage(req, res);
+
         const message = await InboxMessage.findOne({ _id: req.params.id, user: req.user._id })
             .populate('senderAccount', 'email displayName')
             .populate('campaign', 'name');
@@ -113,6 +219,19 @@ const markRead = async (req, res) => {
         res.json(message);
     } catch (error) {
         res.status(500).json({ message: 'Error updating message', error: error.message });
+    }
+};
+
+const markAllRead = async (req, res) => {
+    try {
+        const filter = accountFilter(req.user._id, req.body?.senderAccountId || req.query.account);
+        const result = await InboxMessage.updateMany(
+            addInboxFolderFilter({ ...filter, isRead: false }),
+            { $set: { isRead: true } }
+        );
+        res.json({ message: `Marked ${result.modifiedCount || 0} message(s) as read`, modifiedCount: result.modifiedCount || 0 });
+    } catch (error) {
+        res.status(500).json({ message: 'Error marking messages read', error: error.message });
     }
 };
 
@@ -153,7 +272,12 @@ const syncInbox = async (req, res) => {
                 return res.status(404).json({ message: 'Sender account not found' });
             }
             const count = await syncSenderAccount(account);
-            return res.json({ message: `Synced ${count} new message(s) for ${account.email}`, count });
+            return res.json({
+                message: `Synced ${count.inbox} inbox and ${count.sent} sent new message(s) for ${account.email}`,
+                count: count.total,
+                inbox: count.inbox,
+                sent: count.sent,
+            });
         }
         await syncAllAccounts();
         res.json({ message: 'Inbox sync completed for all accounts' });
@@ -164,7 +288,12 @@ const syncInbox = async (req, res) => {
 
 const inboxStats = async (req, res) => {
     try {
-        const base = accountFilter(req.user._id, req.query.account);
+        const base = addInboxFolderFilter(accountFilter(req.user._id, req.query.account));
+        let sentFilter = { user: req.user._id, 'recipients.status': 'sent' };
+        if (req.query.account) {
+            const sender = await SenderAccount.findOne({ _id: req.query.account, user: req.user._id }).select('email');
+            sentFilter = sender ? { ...sentFilter, 'recipients.senderEmail': sender.email } : null;
+        }
         const [total, unread, starred, important, withCampaign] = await Promise.all([
             InboxMessage.countDocuments(base),
             InboxMessage.countDocuments({ ...base, isRead: false }),
@@ -172,7 +301,21 @@ const inboxStats = async (req, res) => {
             InboxMessage.countDocuments({ ...base, isImportant: true }),
             InboxMessage.countDocuments({ ...base, campaign: { $ne: null } }),
         ]);
-        res.json({ total, unread, starred, important, campaignReplies: withCampaign });
+        const sentAgg = sentFilter
+            ? await Campaign.aggregate([
+                { $match: sentFilter },
+                { $unwind: '$recipients' },
+                { $match: {
+                    'recipients.status': 'sent',
+                    ...(sentFilter['recipients.senderEmail'] ? { 'recipients.senderEmail': sentFilter['recipients.senderEmail'] } : {}),
+                } },
+                { $count: 'total' },
+            ])
+            : [];
+        const savedSentBase = accountFilter(req.user._id, req.query.account);
+        const savedSent = await InboxMessage.countDocuments({ ...savedSentBase, folder: 'sent' });
+        const sent = (sentAgg[0]?.total || 0) + savedSent;
+        res.json({ total, unread, starred, important, campaignReplies: withCampaign, sent });
     } catch (error) {
         res.status(500).json({ message: 'Error fetching inbox stats', error: error.message });
     }
@@ -216,6 +359,24 @@ const replyToMessage = async (req, res) => {
             references: message.messageId,
         });
 
+        await InboxMessage.create({
+            user: req.user._id,
+            senderAccount: sender._id,
+            campaign: message.campaign || undefined,
+            folder: 'sent',
+            uid: `sent-reply-${message._id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            messageId,
+            inReplyTo: message.messageId,
+            from: sender.email,
+            to,
+            subject: subject || message.subject,
+            bodyPreview: String(body).trim().slice(0, 250),
+            body: String(body).trim(),
+            isRead: true,
+            threadKey: message.threadKey || message.messageId || '',
+            receivedAt: new Date(),
+        });
+
         res.json({
             message: 'Reply sent',
             to,
@@ -252,6 +413,7 @@ module.exports = {
     listMessages,
     getMessage,
     markRead,
+    markAllRead,
     toggleStar,
     toggleImportant,
     syncInbox,

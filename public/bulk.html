@@ -123,6 +123,32 @@
                 </div>
             </div>
 
+            <div class="glass-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <h5 class="fw-bold mb-0">Recent Jobs</h5>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="downloadRecentJobsBtn" disabled>
+                        <i class="fa-solid fa-download me-1"></i>Download Recent Jobs
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Valid</th>
+                                <th>Started</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentJobsBody">
+                            <tr><td colspan="6" class="text-center text-muted">Loading recent jobs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div id="resultsTableSection" class="d-none">
                 <div class="glass-card p-4">
                     <h5 class="fw-bold mb-3">Recent Results <span class="text-muted small fw-normal">(latest verified)</span></h5>
@@ -151,6 +177,7 @@
         let redirectTimer = null;
         let currentJobId = null;
         let allRows = [];
+        let recentJobs = [];
         let userSettings = { autoRedirectAfterVerify: true };
 
         const uploadForm = document.getElementById('uploadForm');
@@ -160,6 +187,7 @@
         const exportBtn = document.getElementById('exportBtn');
         const exportValidBtn = document.getElementById('exportValidBtn');
         const createCampaignBtn = document.getElementById('createCampaignBtn');
+        const downloadRecentJobsBtn = document.getElementById('downloadRecentJobsBtn');
 
         function ynBadge(val) {
             return `<span class="badge ${val ? 'bg-success' : 'bg-danger'}">${val ? 'yes' : 'no'}</span>`;
@@ -174,7 +202,108 @@
             return str.length > n ? str.slice(0, n) + '…' : str;
         }
 
+        function statusBadge(status) {
+            const map = {
+                completed: 'bg-success',
+                running: 'bg-primary',
+                queued: 'bg-info text-dark',
+                paused: 'bg-warning text-dark',
+                cancelled: 'bg-secondary',
+                failed: 'bg-danger',
+            };
+            return `<span class="badge ${map[status] || 'bg-secondary'}">${String(status || 'unknown').toUpperCase()}</span>`;
+        }
+
+        function downloadableCount(job) {
+            return job.stats?.completed || (job.status === 'completed' ? job.stats?.totalEmails : 0) || 0;
+        }
+
+        async function downloadVerifyJob(jobId, validOnly) {
+            const res = await axios.get(`/api/verify/jobs/${jobId}?full=1`);
+            const job = res.data;
+            const rows = (job.rows || []).filter(r => r.status !== 'pending');
+            const csv = CsvExport.buildVerificationCsv(rows, validOnly, job.headers || []);
+            if (!csv) {
+                showToast(validOnly ? 'No valid emails available yet' : 'No completed rows available yet', 'warning');
+                return false;
+            }
+            const suffix = validOnly ? '_valid' : (job.status === 'completed' ? '_all' : '_so_far');
+            CsvExport.downloadCsv(csv, `${CsvExport.fileBaseName(job.fileName)}${suffix}.csv`);
+            return true;
+        }
+
+        async function loadRecentJobs() {
+            const tbody = document.getElementById('recentJobsBody');
+            try {
+                const res = await axios.get('/api/verify/jobs/recent');
+                recentJobs = res.data || [];
+                renderRecentJobs();
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Could not load recent jobs</td></tr>';
+            }
+        }
+
+        function renderRecentJobs() {
+            const tbody = document.getElementById('recentJobsBody');
+            if (!recentJobs.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No recent jobs yet.</td></tr>';
+                downloadRecentJobsBtn.disabled = true;
+                return;
+            }
+
+            tbody.innerHTML = recentJobs.map(job => {
+                const s = job.stats || {};
+                const total = s.totalEmails || 0;
+                const done = downloadableCount(job);
+                const pct = total ? Math.round((done / total) * 100) : 0;
+                const disabled = done ? '' : 'disabled';
+                return `<tr>
+                    <td class="fw-medium"><i class="fa-solid fa-file-csv me-2 text-primary"></i>${job.fileName || ''}</td>
+                    <td>${statusBadge(job.status)}</td>
+                    <td>${done} / ${total} <span class="text-muted small">(${pct}%)</span></td>
+                    <td class="text-success fw-semibold">${s.valid || 0}</td>
+                    <td class="text-muted small">${new Date(job.createdAt).toLocaleString()}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-success recent-download-all" data-id="${job._id}" ${disabled} title="Download all completed rows">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                            <button type="button" class="btn btn-success recent-download-valid" data-id="${job._id}" ${disabled} title="Download valid completed rows">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            downloadRecentJobsBtn.disabled = !recentJobs.some(downloadableCount);
+            tbody.querySelectorAll('.recent-download-all').forEach(btn => {
+                btn.addEventListener('click', () => downloadVerifyJob(btn.dataset.id, false));
+            });
+            tbody.querySelectorAll('.recent-download-valid').forEach(btn => {
+                btn.addEventListener('click', () => downloadVerifyJob(btn.dataset.id, true));
+            });
+        }
+
+        function syncRecentJob(job) {
+            if (!job?._id || !recentJobs.length) return;
+            const idx = recentJobs.findIndex(j => j._id === job._id);
+            const compact = {
+                _id: job._id,
+                fileName: job.fileName,
+                status: job.status,
+                stats: job.stats,
+                createdAt: job.createdAt,
+                completedAt: job.completedAt,
+                bulkJobId: job.bulkJobId,
+            };
+            if (idx >= 0) recentJobs[idx] = compact;
+            else recentJobs.unshift(compact);
+            renderRecentJobs();
+        }
+
         function updateUI(job) {
+            syncRecentJob(job);
             const s = job.stats || {};
             const p = job.progress || {};
             document.getElementById('pValid').textContent = s.valid ?? 0;
@@ -231,8 +360,11 @@
 
             const done = job.status === 'completed';
             const hasSavedList = !!job.bulkJobId;
-            exportBtn.classList.toggle('d-none', !done && !hasSavedList);
-            exportValidBtn.classList.toggle('d-none', !done && !hasSavedList);
+            const hasCompletedRows = (p.completed || 0) > 0;
+            exportBtn.classList.toggle('d-none', !hasCompletedRows && !done && !hasSavedList);
+            exportValidBtn.classList.toggle('d-none', !hasCompletedRows && !done && !hasSavedList);
+            exportBtn.innerHTML = `<i class="fa-solid fa-download me-2"></i>${done ? 'Export All (CSV)' : 'Download So Far (CSV)'}`;
+            exportValidBtn.innerHTML = `<i class="fa-solid fa-check me-2"></i>${done ? 'Valid Only (CSV)' : 'Valid So Far (CSV)'}`;
             createCampaignBtn.classList.toggle('d-none', !hasSavedList);
             if (job.bulkJobId) {
                 createCampaignBtn.href = `/campaign-create.html?bulkJobId=${job.bulkJobId}`;
@@ -299,6 +431,7 @@
                         allRows = full.data.rows || [];
                         showToast('Bulk verification complete!', 'success');
                         scheduleCampaignRedirect(job.bulkJobId, job.fileName);
+                        loadRecentJobs();
                     } else if (['failed', 'cancelled'].includes(job.status)) {
                         stopPolling();
                         BulkJob.clearActiveJobId();
@@ -307,12 +440,14 @@
                             const full = await axios.get(`/api/verify/jobs/${jobId}?full=1`);
                             allRows = full.data.rows || [];
                         }
+                        loadRecentJobs();
                     } else if (job.status === 'paused') {
                         stopPolling();
                         if (job.bulkJobId) {
                             const full = await axios.get(`/api/verify/jobs/${jobId}?full=1`);
                             allRows = full.data.rows || [];
                         }
+                        loadRecentJobs();
                     }
                 } catch (err) {
                     console.warn('Poll error', err);
@@ -345,6 +480,7 @@
 
                 showToast(`Started verifying ${res.data.stats?.totalEmails || 0} emails on server`, 'success');
                 startPolling(res.data._id);
+                loadRecentJobs();
             } catch (err) {
                 const msg = err.response?.data?.message || 'Failed to start job';
                 if (err.response?.status === 409 && err.response?.data?.jobId) {
@@ -373,6 +509,7 @@
                 if (path === '/resume') startPolling(currentJobId);
                 if (path === '/pause') {
                     stopPolling();
+                    loadRecentJobs();
                     if (res.data.bulkJobId) {
                         createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
                         createCampaignBtn.classList.remove('d-none');
@@ -382,6 +519,7 @@
                 if (path === '/cancel') {
                     stopPolling();
                     BulkJob.clearActiveJobId();
+                    loadRecentJobs();
                     if (res.data.bulkJobId) {
                         createCampaignBtn.href = `/campaign-create.html?bulkJobId=${res.data.bulkJobId}`;
                         createCampaignBtn.classList.remove('d-none');
@@ -422,16 +560,35 @@
             }
         });
 
-        exportBtn.addEventListener('click', () => {
-            if (!allRows.length) return;
-            CsvExport.downloadCsv(CsvExport.buildVerificationCsv(allRows, false), 'verification_all.csv');
+        exportBtn.addEventListener('click', async () => {
+            if (!currentJobId) return;
+            try {
+                await downloadVerifyJob(currentJobId, false);
+            } catch (err) {
+                showToast('Download failed', 'error');
+            }
         });
-        exportValidBtn.addEventListener('click', () => {
-            if (!allRows.length) return;
-            CsvExport.downloadCsv(CsvExport.buildVerificationCsv(allRows, true), 'verification_valid.csv');
+        exportValidBtn.addEventListener('click', async () => {
+            if (!currentJobId) return;
+            try {
+                await downloadVerifyJob(currentJobId, true);
+            } catch (err) {
+                showToast('Download failed', 'error');
+            }
+        });
+        downloadRecentJobsBtn.addEventListener('click', async () => {
+            const jobs = recentJobs.filter(downloadableCount);
+            let count = 0;
+            for (const job of jobs) {
+                try {
+                    if (await downloadVerifyJob(job._id, false)) count++;
+                } catch (_) {}
+            }
+            showToast(count ? `Downloaded ${count} recent job file${count > 1 ? 's' : ''}` : 'No recent rows available yet', count ? 'success' : 'warning');
         });
 
         document.addEventListener('DOMContentLoaded', async () => {
+            loadRecentJobs();
             try {
                 const settingsRes = await axios.get('/api/settings');
                 userSettings = settingsRes.data || userSettings;

@@ -6,6 +6,11 @@ const {
     FREIGHT_VARIANT_TEMPLATES,
 } = require('./freightDispatchTemplates');
 
+const BUILT_IN_TEMPLATE_NAMES = new Set([
+    FREIGHT_DISPATCH_NAME,
+    ...FREIGHT_VARIANT_TEMPLATES.map(t => t.name),
+]);
+
 const STARTER_TEMPLATES = [
     {
         name: 'Soft Introduction',
@@ -54,11 +59,16 @@ Thanks,
 async function upsertTemplate(userId, tpl, { forceDefault = false } = {}) {
     const existing = await EmailTemplate.findOne({ user: userId, name: tpl.name });
     if (existing) {
+        if (BUILT_IN_TEMPLATE_NAMES.has(tpl.name)) {
+            existing.companyName = tpl.companyName || existing.companyName;
+            existing.subjectTemplates = tpl.subjectTemplates || existing.subjectTemplates;
+            existing.bodyTemplates = tpl.bodyTemplates || existing.bodyTemplates;
+        }
         if (forceDefault && tpl.isDefault) {
             await EmailTemplate.updateMany({ user: userId }, { isDefault: false });
             existing.isDefault = true;
-            await existing.save();
         }
+        if (existing.isModified()) await existing.save();
         return existing;
     }
 

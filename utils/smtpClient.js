@@ -15,6 +15,17 @@ function createTransport(sender) {
     });
 }
 
+function cleanPlainText(value) {
+    return String(value || '')
+        .normalize('NFKC')
+        .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+        .replace(/[\u2013\u2014]/g, '-')
+        .replace(/\u00a0/g, ' ')
+        .replace(/[ \t]+\r?\n/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .trim();
+}
+
 async function verifySmtp(sender) {
     const transport = createTransport(sender);
     await transport.verify();
@@ -27,7 +38,7 @@ async function sendWarmUp(sender) {
     const info = await transport.sendMail({
         from: `"${name}" <${sender.email}>`,
         to: sender.email,
-        subject: 'MailForge — account warm-up',
+        subject: 'MailForge - account warm-up',
         text: 'This is a warm-up message sent before your campaign begins.',
     });
     await transport.close();
@@ -40,8 +51,9 @@ async function sendCampaignMessage(sender, to, subject, body, options = {}) {
     const mailOptions = {
         from: `"${name}" <${sender.email}>`,
         to,
-        subject,
-        text: body,
+        subject: cleanPlainText(subject),
+        text: cleanPlainText(body),
+        encoding: 'utf-8',
     };
     if (options.inReplyTo) {
         const id = String(options.inReplyTo).replace(/^<|>$/g, '');
