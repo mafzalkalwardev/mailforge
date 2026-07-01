@@ -27,6 +27,24 @@ function Require-Command {
     if ($LASTEXITCODE -ne 0) {
         throw "winget failed to install $DisplayName"
     }
+
+    Update-ProcessPath
+
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "$DisplayName was installed, but this installer window cannot see it yet. Close this window and run Client-Install-MailForge.bat again."
+    }
+}
+
+function Update-ProcessPath {
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $extraPaths = @(
+        "$env:ProgramFiles\Go\bin",
+        "$env:ProgramFiles\nodejs",
+        "${env:ProgramFiles(x86)}\nodejs"
+    ) | Where-Object { $_ -and (Test-Path $_) }
+
+    $env:Path = @($machinePath, $userPath, ($extraPaths -join ";")) -join ";"
 }
 
 function New-Shortcut {
@@ -49,6 +67,7 @@ function New-Shortcut {
 Write-Host "MailForge Windows Installer"
 Write-Host "Installing to $InstallDir"
 
+Update-ProcessPath
 Require-Command -Name "node" -WingetId "OpenJS.NodeJS.LTS" -DisplayName "Node.js LTS"
 Require-Command -Name "npm" -WingetId "OpenJS.NodeJS.LTS" -DisplayName "npm"
 
