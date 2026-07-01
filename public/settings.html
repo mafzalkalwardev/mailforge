@@ -62,7 +62,7 @@
                     <ul class="list-unstyled small text-muted mb-0">
                         <li class="mb-2"><strong class="text-body">App:</strong> <a id="publicAppUrl" href="/" target="_blank">Current deployment</a></li>
                         <li class="mb-2"><strong class="text-body">Verifier:</strong> <code id="goApiUrl">Not configured</code></li>
-                        <li><strong class="text-body">Live mode:</strong> Vercel needs a hosted verifier URL. Local Go and Docker are for desktop development.</li>
+                        <li><strong class="text-body">Desktop mode:</strong> MailForge runs a portable local database inside the app folder.</li>
                     </ul>
                 </div>
             </div>
@@ -130,7 +130,7 @@
 
                 <div class="glass-card p-4">
                     <h5 class="mb-3 fw-bold"><i class="fa-solid fa-scale-balanced me-2 gradient-text"></i>Engine options</h5>
-                    <p class="small text-muted">Local engines still work on your PC, but live Vercel deployments need a hosted verification backend because serverless functions cannot run Docker or keep a Go process alive.</p>
+                    <p class="small text-muted">Local engines work on your PC. Hosted deployments need a public verification backend because serverless functions cannot keep a Go process alive.</p>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0 engine-compare-table">
                             <thead>
@@ -366,10 +366,11 @@
                 const s = res.data?.storage;
                 if (s?.persistent) {
                     el.className = 'alert alert-success small py-2 mb-3';
-                    el.innerHTML = `<i class="fa-solid fa-database me-1"></i> <strong>Persistent storage</strong> — data is saved in MongoDB (${s.mode}). Compass: <code>mongodb://127.0.0.1:27017/mailforge</code>`;
+                    const where = s.dataDir ? `<br><span class="text-muted">Folder:</span> <code>${s.dataDir}</code>` : '';
+                    el.innerHTML = `<i class="fa-solid fa-database me-1"></i> <strong>Persistent storage</strong> - data is saved in ${s.mode}.${where}`;
                 } else {
                     el.className = 'alert alert-warning small py-2 mb-3';
-                    el.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>In-memory mode</strong> — data is lost on restart. Start Docker Desktop, then run <code>npm run mongo:up</code> and restart the app.`;
+                    el.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>In-memory mode</strong> - data is lost on restart. Use the Windows installer or set <code>MAILFORGE_DB_MODE=embedded</code>.`;
                 }
             } catch {
                 el.className = 'alert alert-secondary small py-2 mb-3';

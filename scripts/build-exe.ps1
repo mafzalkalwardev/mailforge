@@ -28,4 +28,4 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $output)) {
 }
 
 Write-Host "SUCCESS: $output"
-Write-Host "Double-click MailForge.exe (Docker Desktop must be running for persistent DB)."
+Write-Host "Double-click MailForge.exe to run MailForge with embedded portable MongoDB."

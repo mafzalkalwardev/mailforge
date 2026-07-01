@@ -1,4 +1,4 @@
-const { isPersistentStorage, isDbReady, getStorageMode } = require('../config/db');
+const { isPersistentStorage, isDbReady, getStorageMode, getStorageInfo } = require('../config/db');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
@@ -15,6 +15,7 @@ async function pingUrl(url, timeoutMs = 3000) {
 const getHealth = async (req, res) => {
     const goUrl = process.env.GO_VERIFIER_URL || `http://localhost:${process.env.VERIFIER_GO_PORT || 8082}`;
     const reacherUrl = process.env.REACHER_URL || 'http://localhost:8081';
+    const storage = getStorageInfo();
 
     const [go, reacher] = await Promise.all([pingUrl(goUrl), pingUrl(reacherUrl)]);
 
@@ -24,9 +25,11 @@ const getHealth = async (req, res) => {
         storage: {
             persistent: isPersistentStorage(),
             mode: getStorageMode(),
+            dataDir: storage.dataDir,
+            binaryDir: storage.binaryDir,
             warning: isPersistentStorage()
                 ? null
-                : 'Data is lost when the server stops. Run: npm run mongo:up',
+                : 'Data is lost when the server stops. Use embedded portable MongoDB for normal desktop installs.',
         },
         database: {
             connected: isDbReady(),

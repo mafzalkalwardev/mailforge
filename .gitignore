@@ -12,6 +12,8 @@ MailForge.exe
 uploads/
 .cache/
 mongodb-memory-server/
+data/
+tools/mongodb-binaries/
 
 # Go build output
 backend/go/verifier.exe

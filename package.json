@@ -28,6 +28,8 @@
     "stop:reacher": "docker compose down",
     "start:all": "powershell -ExecutionPolicy Bypass -File scripts/start.ps1",
     "setup:go": "cd backend/go && go mod tidy",
+    "build:go": "powershell -ExecutionPolicy Bypass -File scripts/build-go-verifier.ps1",
+    "setup:portable": "npm ci --omit=dev && npm run build:go && node scripts/prepare-portable-mongo.mjs",
     "setup": "npm install && npm run setup:go",
     "setup:new-pc": "powershell -ExecutionPolicy Bypass -File scripts/setup-new-pc.ps1",
     "fix:readmes": "node scripts/fix-all-readmes.mjs",

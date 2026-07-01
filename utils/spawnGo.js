@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 
 let goProcess = null;
@@ -63,10 +64,20 @@ async function ensureGoVerifier() {
 
         console.log(`🚀 Starting truemail-go on port ${port}...`);
 
-        goProcess = spawn('go', ['run', 'main.go'], {
+        const exeName = process.platform === 'win32' ? 'verifier.exe' : 'verifier';
+        const exePath = path.join(goDir, exeName);
+        const useCompiledVerifier = fs.existsSync(exePath);
+        const command = useCompiledVerifier ? exePath : 'go';
+        const args = useCompiledVerifier ? [] : ['run', 'main.go'];
+
+        if (!useCompiledVerifier) {
+            console.warn('Compiled verifier not found - falling back to "go run main.go".');
+        }
+
+        goProcess = spawn(command, args, {
             cwd: goDir,
             stdio: 'inherit',
-            shell: true,
+            shell: !useCompiledVerifier,
             env: { ...process.env, VERIFIER_GO_PORT: port },
         });
 

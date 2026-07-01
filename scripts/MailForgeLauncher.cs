@@ -32,27 +32,19 @@ namespace MailForgeLauncher
             }
         }
 
-        private static bool DockerRunning(string root)
+        private static void OpenBrowser()
         {
-            return Run("docker", "info", root) == 0;
-        }
-
-        private static string MongoHealth(string root)
-        {
-            var psi = new ProcessStartInfo
+            try
             {
-                FileName = "docker",
-                Arguments = "inspect --format \"{{.State.Health.Status}}\" mailforge-mongo",
-                WorkingDirectory = root,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true,
-            };
-            using (var p = Process.Start(psi))
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "http://localhost:5000",
+                    UseShellExecute = true,
+                });
+            }
+            catch
             {
-                if (p == null) return "";
-                p.WaitForExit();
-                return p.StandardOutput.ReadToEnd().Trim();
+                Console.WriteLine("Open http://localhost:5000 in your browser.");
             }
         }
 
@@ -64,7 +56,7 @@ namespace MailForgeLauncher
 
             if (!File.Exists(Path.Combine(root, "package.json")))
             {
-                Console.WriteLine("ERROR: Run MailForge.exe from the MailForge project folder.");
+                Console.WriteLine("ERROR: Run MailForge.exe from the MailForge app folder.");
                 Console.ReadLine();
                 return 1;
             }
@@ -75,42 +67,23 @@ namespace MailForgeLauncher
                 Console.WriteLine("Created .env from .env.example");
             }
 
+            Directory.CreateDirectory(Path.Combine(root, "data", "mongodb"));
+            Directory.CreateDirectory(Path.Combine(root, "tools", "mongodb-binaries"));
+
             Console.WriteLine("MailForge launcher");
             Console.WriteLine("==================");
-
-            if (DockerRunning(root))
-            {
-                Console.WriteLine("Starting local MongoDB (Docker)...");
-                if (Run("docker", "compose -f docker-compose.mongo.yml up -d", root) != 0)
-                {
-                    Console.WriteLine("ERROR: Could not start MongoDB container.");
-                    Console.ReadLine();
-                    return 1;
-                }
-
-                var deadline = DateTime.UtcNow.AddSeconds(45);
-                var health = "";
-                while (DateTime.UtcNow < deadline)
-                {
-                    health = MongoHealth(root);
-                    if (health == "healthy") break;
-                    Thread.Sleep(2000);
-                }
-
-                if (health == "healthy")
-                    Console.WriteLine("MongoDB ready at mongodb://127.0.0.1:27017/mailforge");
-                else
-                    Console.WriteLine("WARNING: MongoDB not healthy yet - app will retry.");
-            }
-            else
-            {
-                Console.WriteLine("WARNING: Docker Desktop is not running. Start it for persistent data.");
-            }
-
+            Console.WriteLine("Using embedded portable MongoDB.");
+            Console.WriteLine("Data folder: " + Path.Combine(root, "data", "mongodb"));
             Console.WriteLine();
             Console.WriteLine("Starting MailForge at http://localhost:5000");
             Console.WriteLine("Close this window to stop the server.");
             Console.WriteLine();
+
+            new Thread(() =>
+            {
+                Thread.Sleep(2500);
+                OpenBrowser();
+            }).Start();
 
             return Run("cmd.exe", "/c npm start", root);
         }
