@@ -31,8 +31,8 @@ const AppSettingsSchema = new mongoose.Schema(
         bulkConcurrency: {
             type: Number,
             min: 1,
-            max: 5,
-            default: 3,
+            max: 50,
+            default: 15,
         },
         reacherTimeoutMs: {
             type: Number,

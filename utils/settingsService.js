@@ -1,4 +1,5 @@
 const AppSettings = require('../models/AppSettings');
+const { DEFAULT_BULK_CONCURRENCY, sanitizeBulkConcurrency } = require('./concurrency');
 
 function cleanUrl(value) {
     const trimmed = String(value || '').trim();
@@ -19,7 +20,7 @@ function defaultSettings() {
         goVerifierUrl: cleanUrl(process.env.GO_VERIFIER_URL || 'http://localhost:8082'),
         reacherUrl: cleanUrl(process.env.REACHER_URL || 'http://localhost:8081'),
         smtpProxy: process.env.SMTP_PROXY || '',
-        bulkConcurrency: Math.min(parseInt(process.env.BULK_CONCURRENCY || '3', 10), 5),
+        bulkConcurrency: sanitizeBulkConcurrency(process.env.BULK_CONCURRENCY, DEFAULT_BULK_CONCURRENCY),
         reacherTimeoutMs: parseInt(process.env.REACHER_TIMEOUT_MS || '45000', 10),
         openaiApiKey: process.env.OPENAI_API_KEY || '',
         groqApiKey: process.env.GROQ_API_KEY || '',
@@ -47,7 +48,7 @@ function sanitizeSettings(input = {}) {
         goVerifierUrl: cleanUrl(input.goVerifierUrl ?? defaults.goVerifierUrl),
         reacherUrl: cleanUrl(input.reacherUrl ?? defaults.reacherUrl),
         smtpProxy: String(input.smtpProxy ?? defaults.smtpProxy ?? '').trim(),
-        bulkConcurrency: Number.isFinite(bulkConcurrency) ? Math.min(Math.max(bulkConcurrency, 1), 5) : 3,
+        bulkConcurrency: sanitizeBulkConcurrency(bulkConcurrency, DEFAULT_BULK_CONCURRENCY),
         reacherTimeoutMs: Number.isFinite(reacherTimeoutMs) ? Math.min(Math.max(reacherTimeoutMs, 5000), 180000) : 45000,
         openaiApiKey: String(input.openaiApiKey ?? defaults.openaiApiKey ?? '').trim(),
         groqApiKey: String(input.groqApiKey ?? defaults.groqApiKey ?? '').trim(),
@@ -72,7 +73,12 @@ async function getSettingsForUser(userId) {
     const saved = await AppSettings.findOne({ user: userId }).lean();
     if (!saved) return defaults;
 
-    return sanitizeSettings({ ...defaults, ...saved });
+    const merged = { ...defaults, ...saved };
+    if (saved.bulkConcurrency === 3) {
+        merged.bulkConcurrency = defaults.bulkConcurrency;
+    }
+
+    return sanitizeSettings(merged);
 }
 
 async function saveSettingsForUser(userId, input) {

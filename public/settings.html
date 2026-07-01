@@ -87,7 +87,8 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Bulk concurrency</label>
-                            <input id="bulkConcurrency" type="number" min="1" max="5" class="form-control">
+                            <input id="bulkConcurrency" type="number" min="1" max="50" class="form-control">
+                            <div class="form-text">Use 15-25 for fast local checks; lower it if SMTP providers throttle.</div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Timeout ms</label>
@@ -254,7 +255,7 @@
             document.getElementById('goVerifierUrl').value = settings.goVerifierUrl || '';
             document.getElementById('reacherUrl').value = settings.reacherUrl || '';
             document.getElementById('smtpProxy').value = settings.smtpProxy || '';
-            document.getElementById('bulkConcurrency').value = settings.bulkConcurrency || 3;
+            document.getElementById('bulkConcurrency').value = settings.bulkConcurrency || 15;
             document.getElementById('reacherTimeoutMs').value = settings.reacherTimeoutMs || 45000;
             document.getElementById('goApiUrl').textContent = settings.goVerifierUrl || settings.reacherUrl || 'Not configured';
             if (document.getElementById('openaiApiKey')) {
@@ -301,7 +302,7 @@
                 goVerifierUrl: document.getElementById('goVerifierUrl').value,
                 reacherUrl: document.getElementById('reacherUrl').value,
                 smtpProxy: document.getElementById('smtpProxy').value,
-                bulkConcurrency: Number(document.getElementById('bulkConcurrency').value || 3),
+                bulkConcurrency: Number(document.getElementById('bulkConcurrency').value || 15),
                 reacherTimeoutMs: Number(document.getElementById('reacherTimeoutMs').value || 45000),
             };
         }

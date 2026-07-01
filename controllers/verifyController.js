@@ -2,6 +2,7 @@ const ValidationHistory = require('../models/ValidationHistory');
 const { verifyEmailCombined } = require('../utils/verificationEngine');
 const { getSettingsForUser } = require('../utils/settingsService');
 const { parseBulkFile } = require('../utils/csvEmailParser');
+const { sanitizeBulkConcurrency } = require('../utils/concurrency');
 const fs = require('fs');
 
 // @desc    Verify single email
@@ -44,7 +45,7 @@ const verifyBulkEmails = async (req, res) => {
     }
 
     const settings = await getSettingsForUser(req.user._id);
-    const concurrency = Math.min(parseInt(settings.bulkConcurrency || '3', 10), 5);
+    const concurrency = sanitizeBulkConcurrency(settings.bulkConcurrency);
     const results = new Array(emails.length);
 
     async function verifyOne(email, index) {

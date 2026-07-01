@@ -2,12 +2,9 @@ const VerifyJob = require('../models/VerifyJob');
 const BulkJob = require('../models/BulkJob');
 const { verifyEmailCombined } = require('./verificationEngine');
 const { getSettingsForUser } = require('./settingsService');
+const { sanitizeBulkConcurrency } = require('./concurrency');
 
 const activeWorkers = new Map();
-
-function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
-}
 
 function tallyResult(stats, result) {
     stats.completed++;
@@ -116,7 +113,7 @@ async function runVerifyJobWorker(jobId) {
         }
 
         const settings = await getSettingsForUser(job.user);
-        const concurrency = Math.min(Math.max(parseInt(settings.bulkConcurrency || '3', 10), 1), 5);
+        const concurrency = sanitizeBulkConcurrency(settings.bulkConcurrency);
 
         while (true) {
             job = await VerifyJob.findById(jobId);
@@ -130,41 +127,57 @@ async function runVerifyJobWorker(jobId) {
             const emails = job.emails || [];
             if (job.nextEmailIndex >= emails.length) break;
 
-            const batch = emails.slice(job.nextEmailIndex, job.nextEmailIndex + concurrency);
+            let nextIndex = job.nextEmailIndex || 0;
+            const saveEvery = Math.max(concurrency, 10);
+            let completedSinceSave = 0;
+            let lastSaveAt = Date.now();
+            const saveProgress = async ({ force = false } = {}) => {
+                if (!force && completedSinceSave < saveEvery && Date.now() - lastSaveAt < 1500) {
+                    return;
+                }
+                job.nextEmailIndex = nextIndex;
+                job.markModified('resultsByEmail');
+                job.markModified('stats');
+                await job.save();
+                completedSinceSave = 0;
+                lastSaveAt = Date.now();
+            };
 
-            const outcomes = await Promise.all(
-                batch.map(async email => {
-                    try {
-                        const result = await verifyEmailCombined(email, job.user);
-                        return { email, result };
-                    } catch (err) {
-                        return {
-                            email,
-                            result: {
-                                email,
-                                valid: false,
-                                domain_valid: false,
-                                mailbox_verified: 'no_smtp',
-                                smtp_response: '',
-                                status: 'error',
-                                error: err.message,
-                            },
-                        };
-                    }
-                })
-            );
-
-            for (const { email, result } of outcomes) {
-                job.resultsByEmail[email] = result;
-                tallyResult(job.stats, result);
+            async function verifyAtIndex(index) {
+                const email = emails[index];
+                try {
+                    const result = await verifyEmailCombined(email, job.user);
+                    job.resultsByEmail[email] = result;
+                    tallyResult(job.stats, result);
+                } catch (err) {
+                    const result = {
+                        email,
+                        valid: false,
+                        domain_valid: false,
+                        mailbox_verified: 'no_smtp',
+                        smtp_response: '',
+                        status: 'error',
+                        error: err.message,
+                    };
+                    job.resultsByEmail[email] = result;
+                    tallyResult(job.stats, result);
+                }
+                completedSinceSave++;
+                await saveProgress();
             }
 
-            job.nextEmailIndex += batch.length;
-            job.markModified('resultsByEmail');
-            job.markModified('stats');
-            await job.save();
+            async function worker() {
+                while (!abort.cancelled) {
+                    const index = nextIndex;
+                    if (index >= emails.length) return;
+                    nextIndex++;
+                    await verifyAtIndex(index);
+                }
+            }
 
-            await sleep(100);
+            const workerCount = Math.min(concurrency, emails.length - nextIndex);
+            await Promise.all(Array.from({ length: workerCount }, () => worker()));
+            await saveProgress({ force: true });
         }
 
         job = await VerifyJob.findById(jobId);
