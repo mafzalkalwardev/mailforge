@@ -131,16 +131,20 @@ async function runVerifyJobWorker(jobId) {
             const saveEvery = Math.max(concurrency, 10);
             let completedSinceSave = 0;
             let lastSaveAt = Date.now();
+            let saveQueue = Promise.resolve();
             const saveProgress = async ({ force = false } = {}) => {
                 if (!force && completedSinceSave < saveEvery && Date.now() - lastSaveAt < 1500) {
                     return;
                 }
-                job.nextEmailIndex = nextIndex;
-                job.markModified('resultsByEmail');
-                job.markModified('stats');
-                await job.save();
-                completedSinceSave = 0;
-                lastSaveAt = Date.now();
+                saveQueue = saveQueue.then(async () => {
+                    job.nextEmailIndex = nextIndex;
+                    job.markModified('resultsByEmail');
+                    job.markModified('stats');
+                    await job.save();
+                    completedSinceSave = 0;
+                    lastSaveAt = Date.now();
+                });
+                await saveQueue;
             };
 
             async function verifyAtIndex(index) {
