@@ -13,6 +13,7 @@ const { seedTemplatesForAllUsers } = require('./utils/seedTemplates');
 const { startCampaignScheduler, stopCampaignScheduler } = require('./utils/campaignScheduler');
 
 dotenv.config();
+const { requireIndusLicense } = require('./lib/indus_license');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +21,7 @@ const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCT
 let startPromise = null;
 
 async function start() {
+    await requireIndusLicense(__dirname);
     resetEngineCache();
     console.log('Connecting to database...');
     await connectDB();
