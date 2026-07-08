@@ -5,7 +5,6 @@ const { getSettingsForUser } = require('./settingsService');
 const { applySmtpResponseRules } = require('./smtpResponseRules');
 
 const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const defaultGoBase = (process.env.GO_VERIFIER_URL || 'http://localhost:8082').replace(/\/$/, '');
 
 const engineCache = new Map();
 
@@ -26,12 +25,16 @@ function normalizeBase(url, fallback) {
     return String(url || fallback || '').replace(/\/$/, '');
 }
 
+function defaultGoBase() {
+    return normalizeBase(process.env.GO_VERIFIER_URL, 'http://localhost:8082');
+}
+
 async function settingsFor(userId) {
     return getSettingsForUser(userId);
 }
 
 async function verifyWithGo(email, settings = {}) {
-    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase);
+    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase());
     const url = `${goBase}/v1/${encodeURIComponent(email)}/verification`;
     const { data } = await axios.get(url, { timeout: 120000 });
     return { ...data, engine: data.engine || 'truemail-go' };
@@ -68,7 +71,7 @@ function wrapResult(report, email) {
 }
 
 async function isTruemailUp(settings = {}) {
-    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase);
+    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase());
     try {
         const { data } = await axios.get(`${goBase}/health`, { timeout: 3000 });
         return data?.status === 'ok';
@@ -78,7 +81,7 @@ async function isTruemailUp(settings = {}) {
 }
 
 async function ensureTruemailReady(settings = {}) {
-    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase);
+    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase());
     if (await isTruemailUp(settings)) return true;
 
     if (!IS_SERVERLESS && isLocalUrl(goBase)) {
@@ -190,7 +193,7 @@ async function verifyEmailCombined(email, userId) {
 
 async function checkBackendHealth(userId) {
     const settings = await settingsFor(userId);
-    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase);
+    const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase());
     const reacherUrl = normalizeBase(settings.reacherUrl, REACHER_BASE);
     const health = {
         go: false,
@@ -235,7 +238,7 @@ module.exports = {
     verifyEmailCombined,
     checkBackendHealth,
     verifyWithGo,
-    GO_BASE: defaultGoBase,
+    GO_BASE: defaultGoBase(),
     mapStatus,
     resolveEngine,
     resetEngineCache,

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const xlsx = require('xlsx');
+const readXlsxFile = require('read-excel-file/node');
 
 const EMAIL_RE = /[^\s,;"<>]+@[^\s,;"<>]+\.[^\s,;"<>]+/gi;
 
@@ -104,11 +104,8 @@ function parseCsvFile(filePath) {
     return { rows, emails, headers, delimiter };
 }
 
-function parseXlsxFile(filePath) {
-    const workbook = xlsx.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+async function parseXlsxFile(filePath) {
+    const data = await readXlsxFile(filePath);
 
     let headers = null;
     let startIndex = 0;
@@ -152,7 +149,7 @@ function parseXlsxFile(filePath) {
     return { rows, emails, headers };
 }
 
-function parseBulkFile(filePath, originalname) {
+async function parseBulkFile(filePath, originalname) {
     if (originalname.endsWith('.xlsx')) {
         return parseXlsxFile(filePath);
     }

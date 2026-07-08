@@ -8,13 +8,17 @@ Use this guide to install MailForge on a Windows PC like a normal desktop app.
 - Internet access for first-time setup
 - The installer can install Node.js LTS and Go with `winget` if they are missing
 - Docker is not required
+- A valid INDUS subscription license file from the INDUS dashboard
 
 ## Install
 
 1. Copy the full `MailForge` folder to the client PC.
-2. Double-click `Client-Install-MailForge.bat`.
-3. Let the installer finish.
-4. Start MailForge from the Start Menu, Desktop shortcut, or `MailForge.exe`.
+2. Copy the client's `indus-license*.json` file into the same `MailForge` folder.
+   - The app also accepts the license file in `MailForge\data\`.
+   - Keep the filename starting with `indus-license` and ending with `.json`.
+3. Double-click `Client-Install-MailForge.bat`.
+4. Let the installer finish.
+5. Start MailForge from the Start Menu, Desktop shortcut, or `MailForge.exe`.
 
 The installer will:
 
@@ -38,6 +42,8 @@ The app opens at:
 
 `http://localhost:5000`
 
+On startup, MailForge verifies the INDUS license online. After a successful online check, the app can tolerate short internet outages using its local license cache. If the client sees `No INDUS license file found`, place the license JSON in the app folder or `data` folder and start MailForge again.
+
 ## Data
 
 MailForge stores client data locally in:
@@ -59,6 +65,8 @@ powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\MailForge\s
 ## Common Fixes
 
 - If port `5000` is already used, change `PORT=5000` in `.env`.
+- If startup says `No INDUS license file found`, copy the client's `indus-license*.json` file into the MailForge folder or `data` folder.
+- If startup says the subscription expired, renew or download a fresh license from the INDUS dashboard.
 - If verification cannot start, run `Client-Install-MailForge.bat` again to rebuild the verifier and prepare MongoDB.
 - If email sending fails, check each sender's SMTP host, port, email, password/app password, and enabled status.
 - For Gmail, use an app password when two-step verification is enabled.

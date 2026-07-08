@@ -1,5 +1,5 @@
 const fs = require('fs');
-const xlsx = require('xlsx');
+const readXlsxFile = require('read-excel-file/node');
 
 function normalizeHeader(h) {
     return String(h || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -37,15 +37,17 @@ function parseCsvLine(line, delimiter = ',') {
     return cells;
 }
 
-function parseSenderFile(filePath, originalname) {
+async function readXlsxRows(filePath) {
+    return readXlsxFile(filePath);
+}
+
+async function parseSenderFile(filePath, originalname) {
     const ext = originalname.toLowerCase();
     let rows = [];
     let headers = [];
 
-    if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
-        const wb = xlsx.readFile(filePath);
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const data = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (ext.endsWith('.xlsx')) {
+        const data = await readXlsxRows(filePath);
         if (!data.length) return [];
         headers = data[0].map(c => String(c).trim());
         rows = data.slice(1);

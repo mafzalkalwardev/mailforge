@@ -252,9 +252,10 @@ async function resumeInterruptedJobs() {
 
 function buildRecentResults(job, limit = 30) {
     const emails = (job.emails || []).slice(0, job.nextEmailIndex);
-    const recent = emails.slice(-limit);
+    const completed = emails.filter(email => job.resultsByEmail?.[email]);
+    const recent = completed.slice(-limit);
     return recent.map(email => {
-        const r = job.resultsByEmail[email] || {};
+        const r = job.resultsByEmail[email];
         return {
             email,
             domain_valid: !!r.domain_valid,

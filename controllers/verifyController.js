@@ -5,11 +5,31 @@ const { parseBulkFile } = require('../utils/csvEmailParser');
 const { sanitizeBulkConcurrency } = require('../utils/concurrency');
 const fs = require('fs');
 
+function normalizeHistorySource(value, fallback) {
+    return ['single', 'bulk'].includes(value) ? value : fallback;
+}
+
+async function saveValidationHistory({ user, email, status, source, report }) {
+    try {
+        return await ValidationHistory.create({
+            user,
+            email,
+            status,
+            source,
+            details: { report },
+        });
+    } catch (err) {
+        console.warn(`Validation history save failed for ${email}:`, err.message);
+        return null;
+    }
+}
+
 // @desc    Verify single email
 // @route   POST /api/verify/single
 // @access  Private
 const verifySingleEmail = async (req, res) => {
-    const { email, source = 'single' } = req.body;
+    const { email } = req.body;
+    const source = normalizeHistorySource(req.body.source, 'single');
     if (!email) {
         return res.status(400).json({ message: 'Email is required' });
     }
@@ -17,17 +37,17 @@ const verifySingleEmail = async (req, res) => {
     try {
         const result = await verifyEmailCombined(email, req.user._id);
 
-        const history = await ValidationHistory.create({
+        const history = await saveValidationHistory({
             user: req.user._id,
             email,
             status: result.status,
             source,
-            details: { report: result.report },
+            report: result.report,
         });
 
         res.json({
             ...result,
-            historyId: history._id,
+            historyId: history?._id || null,
         });
     } catch (error) {
         console.error('Verify Single Email Error:', error.message);
@@ -39,7 +59,8 @@ const verifySingleEmail = async (req, res) => {
 // @route   POST /api/verify/bulk
 // @access  Private
 const verifyBulkEmails = async (req, res) => {
-    const { emails, source = 'bulk' } = req.body;
+    const { emails } = req.body;
+    const source = normalizeHistorySource(req.body.source, 'bulk');
     if (!Array.isArray(emails) || emails.length === 0) {
         return res.status(400).json({ message: 'emails array is required' });
     }
@@ -51,12 +72,12 @@ const verifyBulkEmails = async (req, res) => {
     async function verifyOne(email, index) {
         try {
             const result = await verifyEmailCombined(email, req.user._id);
-            await ValidationHistory.create({
+            await saveValidationHistory({
                 user: req.user._id,
                 email,
                 status: result.status,
                 source,
-                details: { report: result.report },
+                report: result.report,
             });
             results[index] = result;
         } catch (err) {
@@ -103,7 +124,7 @@ const uploadBulkFile = async (req, res) => {
             return res.status(400).json({ message: 'Unsupported file format. Use .csv or .xlsx' });
         }
 
-        const parsed = parseBulkFile(filePath, req.file.originalname);
+        const parsed = await parseBulkFile(filePath, req.file.originalname);
         fs.unlinkSync(filePath);
 
         res.json({

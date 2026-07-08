@@ -164,7 +164,12 @@ const bulkImportSenders = async (req, res) => {
     const updateExisting = req.body.updateExisting === 'true' || req.body.updateExisting === true;
 
     try {
-        const parsed = parseSenderFile(filePath, req.file.originalname);
+        const originalName = String(req.file.originalname || '').toLowerCase();
+        if (!originalName.endsWith('.csv') && !originalName.endsWith('.xlsx')) {
+            return res.status(400).json({ message: 'Unsupported file format. Use .csv or .xlsx' });
+        }
+
+        const parsed = await parseSenderFile(filePath, req.file.originalname);
         const results = { added: 0, updated: 0, skipped: 0, errors: [] };
 
         for (const row of parsed) {

@@ -70,7 +70,7 @@ func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func buildConfiguration() (*truemail.Configuration, error) {
+func configuredSmtpPort() int {
 	port := 25
 	if p := os.Getenv("SMTP_PORT"); p != "" {
 		var parsed int
@@ -78,6 +78,11 @@ func buildConfiguration() (*truemail.Configuration, error) {
 			port = parsed
 		}
 	}
+	return port
+}
+
+func buildConfiguration() (*truemail.Configuration, error) {
+	port := configuredSmtpPort()
 	return truemail.NewConfiguration(truemail.ConfigurationAttr{
 		VerifierEmail:         "verifier@example.com",
 		ValidationTypeDefault: "smtp",
@@ -362,7 +367,7 @@ func healthHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":    "ok",
 		"engine":    "truemail-go + AfterShip misc",
-		"smtp_port": 25,
+		"smtp_port": configuredSmtpPort(),
 	})
 }
 

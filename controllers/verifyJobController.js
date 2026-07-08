@@ -83,7 +83,7 @@ const startJobFromUpload = async (req, res) => {
             return res.status(400).json({ message: 'Unsupported file format. Use .csv or .xlsx' });
         }
 
-        const parsed = parseBulkFile(filePath, req.file.originalname);
+        const parsed = await parseBulkFile(filePath, req.file.originalname);
         fs.unlinkSync(filePath);
 
         if (!parsed.emails?.length) {
