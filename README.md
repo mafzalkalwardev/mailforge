@@ -20,7 +20,9 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 ---
 
-> **New PC or client machine?** Double-click `Client-Install-MailForge.bat` for guided Windows setup, follow **[SETUP.md](SETUP.md)** for the full checklist, or run `npm run setup:new-pc` after cloning.
+> **Client Windows install?** Read **[client.md](client.md)**, place the client's `indus-license*.json` file beside `Client-Install-MailForge.bat`, then double-click `Client-Install-MailForge.bat`.
+>
+> **Developer/new PC setup?** Follow **[SETUP.md](SETUP.md)** or run `npm run setup:new-pc` after cloning.
 
 ---
 
@@ -156,9 +158,34 @@ docker compose up -d
 
 ---
 
-## Quick start (Windows)
+## Client delivery (Windows desktop app)
 
-> Full guide: **[SETUP.md](SETUP.md)** | New machine: `npm run setup:new-pc`
+For a client handoff, MailForge is delivered like a local SaaS-style desktop app: the browser UI runs at `http://localhost:5000`, MongoDB data stays inside the installed app folder, and the client starts it from a Desktop or Start Menu shortcut.
+
+Give the client:
+
+- The full `MailForge` folder from the latest GitHub `main`.
+- Their INDUS license file named `indus-license*.json`.
+- The setup guide: **[client.md](client.md)**.
+
+Client install steps:
+
+1. Extract or copy the full `MailForge` folder to the Windows PC.
+2. Put `indus-license*.json` in the MailForge folder, next to `Client-Install-MailForge.bat`.
+3. Double-click `Client-Install-MailForge.bat`.
+4. Let the installer finish.
+5. Open MailForge from the Desktop shortcut, Start Menu, or `MailForge.exe`.
+6. Use `http://localhost:5000` in the browser.
+
+The installer prepares production Node packages, the Go SMTP verifier, embedded MongoDB binaries, local persistent data, Desktop/Start Menu shortcuts, and an uninstall entry. Docker and MongoDB Atlas are not required for the client desktop install.
+
+The app verifies the INDUS subscription license at startup. For client deliveries, do not enable `INDUS_SKIP_LICENSE`; that flag is only for local developer QA.
+
+---
+
+## Quick start (developer / source checkout)
+
+> Full developer guide: **[SETUP.md](SETUP.md)** | Client installer guide: **[client.md](client.md)** | New machine: `npm run setup:new-pc`
 
 ### Prerequisites
 
@@ -167,19 +194,13 @@ docker compose up -d
 
 ### Install & run
 
-For a client PC, use the guided Windows installer:
+For a client PC, use the guided Windows installer after placing the client license file beside it:
 
 ```bat
 Client-Install-MailForge.bat
 ```
 
-It checks Node.js, Go, Docker Desktop, and npm; offers `winget` installs for missing tools; creates `.env`; installs Node and Go dependencies; starts local MongoDB; and opens MailForge.
-
-To validate prerequisites without installing or starting services:
-
-```bat
-Client-Install-MailForge.bat --check
-```
+It checks Node.js, Go, and npm; offers `winget` installs for missing tools; creates `.env`; installs production dependencies; prepares embedded MongoDB; builds the Go verifier; creates shortcuts; and opens MailForge.
 
 Manual install:
 
@@ -323,6 +344,7 @@ Browser → Node.js + Express (:5000)
 | `GROQ_API_KEY` | — | Optional — Groq free tier (recommended) |
 | `AI_PROVIDER` | `groq` | `groq`, `openrouter`, or `openai` |
 | `APP_BASE_URL` | `http://localhost:5000` | Public URL for unsubscribe links |
+| `INDUS_SKIP_LICENSE` | unset | Developer QA bypass only; do not enable in client deliveries |
 
 See [`.env.example`](.env.example) for all options.
 
@@ -338,6 +360,7 @@ Per-user overrides (verifier URLs, OpenAI key, auto-redirect after verify) are a
 |----------|------|
 | **Clone** | `git clone https://github.com/mafzalkalwardev/mailforge.git` |
 | **New PC setup** | [SETUP.md](SETUP.md) |
+| **Client install guide** | [client.md](client.md) |
 | **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | **Security** | [SECURITY.md](SECURITY.md) |
 | **Report bugs** | [Issues](https://github.com/mafzalkalwardev/mailforge/issues) |

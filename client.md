@@ -1,6 +1,21 @@
-# MailForge Client Installation
+# MailForge Client Setup
 
-Use this guide to install MailForge on a Windows PC like a normal desktop app.
+Give this file to the client with the MailForge folder. It is the step-by-step setup guide they can read and follow without needing developer tools.
+
+MailForge installs like a local desktop SaaS app:
+
+- The web app opens in the browser at `http://localhost:5000`.
+- The database runs locally with embedded MongoDB.
+- Client data stays on the client's PC.
+- The app starts from the Desktop shortcut, Start Menu, or `MailForge.exe`.
+
+## What You Should Receive
+
+- A folder named `MailForge`.
+- A license file named like `indus-license-client-name.json`.
+- This setup file, `client.md`.
+
+Keep the license file private. It is required for startup.
 
 ## Requirements
 
@@ -19,6 +34,20 @@ Use this guide to install MailForge on a Windows PC like a normal desktop app.
 3. Double-click `Client-Install-MailForge.bat`.
 4. Let the installer finish.
 5. Start MailForge from the Start Menu, Desktop shortcut, or `MailForge.exe`.
+
+Recommended folder before install:
+
+```text
+MailForge\
+  Client-Install-MailForge.bat
+  client.md
+  indus-license-client-name.json
+  package.json
+  scripts\
+  backend\
+  public\
+  ...
+```
 
 The installer will:
 
@@ -44,6 +73,15 @@ The app opens at:
 
 On startup, MailForge verifies the INDUS license online. After a successful online check, the app can tolerate short internet outages using its local license cache. If the client sees `No INDUS license file found`, place the license JSON in the app folder or `data` folder and start MailForge again.
 
+## First Login
+
+1. Open `http://localhost:5000`.
+2. Register the first admin user.
+3. Go to Settings and confirm the verifier status is ready.
+4. Add sender accounts in Senders.
+5. Use Gmail app passwords, not normal Gmail passwords.
+6. Upload a small test list in Bulk Verify before running a large campaign.
+
 ## Data
 
 MailForge stores client data locally in:
@@ -51,6 +89,16 @@ MailForge stores client data locally in:
 `%LOCALAPPDATA%\Programs\MailForge\data\mongodb`
 
 Do not delete the `data` folder unless you intentionally want to remove saved users, senders, verified lists, inbox data, and campaigns.
+
+## Updating MailForge Later
+
+1. Close MailForge.
+2. Keep a copy of the installed `data` folder and `.env`.
+3. Replace the app files with the newer MailForge package.
+4. Keep the same `indus-license*.json` file in the app folder or `data` folder.
+5. Run `Client-Install-MailForge.bat` again.
+
+The installer is safe to rerun for repairs or updates.
 
 ## Uninstall
 
