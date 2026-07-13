@@ -10,6 +10,7 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Go](https://img.shields.io/badge/Go-1.22-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
+[![Version](https://img.shields.io/badge/Version-1.4.2-blue?style=for-the-badge)](package.json)
 [![Docker](https://img.shields.io/badge/Reacher-Optional-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Setup guide](https://img.shields.io/badge/Setup-SETUP.md-blue?style=for-the-badge)](SETUP.md)
@@ -131,6 +132,17 @@ Self-hosted list verification with **live SMTP proof**, multi-account campaigns,
 - **Health API** — `GET /api/health` reports DB persistence and uptime
 - **Backup export** — `GET /api/backup/export` downloads user data JSON
 - **Bulk job utils tests** — hygiene, dedupe, export covered in CI
+
+### Client delivery & licensing (v1.4)
+- **One-click Windows installer** — `Client-Install-MailForge.bat` installs production deps, builds the Go verifier, downloads embedded MongoDB, and creates Desktop/Start Menu shortcuts
+- **INDUS license gate** — subscription license verified at startup (`indus-license*.json` in app root or `./data`); local cache tolerates short offline periods after first online check
+- **Portable package** — copy the full folder with `MailForge.exe`, `verifier.exe`, and `data/mongodb` to another PC (see [PORTABLE_PACKAGE_NOTES.txt](PORTABLE_PACKAGE_NOTES.txt))
+- **Embedded MongoDB mode** — `MAILFORGE_DB_MODE=embedded` stores data locally without Docker or Atlas
+
+### Performance & reliability (v1.4)
+- **Faster bulk verify** — configurable concurrency via `BULK_CONCURRENCY` (default 15, max 50)
+- **Hardened verifier runtime** — improved Go verifier startup, dependency pinning, and bulk worker error handling
+- **Serialized progress saves** — bulk verification progress is saved safely during pause/stop
 
 ---
 
@@ -336,9 +348,12 @@ Browser → Node.js + Express (:5000)
 |----------|---------|-------------|
 | `PORT` | `5000` | Web UI port |
 | `JWT_SECRET` | — | Auth signing key |
-| `MONGO_URI` | `mongodb://127.0.0.1:27017/mailforge` | Local Docker MongoDB (run `npm run mongo:up`). Atlas optional if IP is whitelisted |
+| `MAILFORGE_DB_MODE` | `embedded` | `embedded` (local portable MongoDB) or `external` (use `MONGO_URI`) |
+| `MAILFORGE_DATA_DIR` | `./data` | Root folder for MongoDB data and license files |
+| `MONGO_URI` | `mongodb://127.0.0.1:27017/mailforge` | Used when `MAILFORGE_DB_MODE=external`. For dev, run `npm run mongo:up` or use Atlas if IP is whitelisted |
 | `VERIFIER_ENGINE` | `auto` | `auto`, `truemail`, or `reacher` |
 | `GO_VERIFIER_URL` | `http://localhost:8082` | truemail-go API |
+| `BULK_CONCURRENCY` | `15` | Parallel SMTP checks during bulk verify (1–50) |
 | `ENCRYPTION_KEY` | — | Encrypts sender credentials |
 | `OPENAI_API_KEY` | — | Optional — OpenAI template generation |
 | `GROQ_API_KEY` | — | Optional — Groq free tier (recommended) |
@@ -361,6 +376,7 @@ Per-user overrides (verifier URLs, OpenAI key, auto-redirect after verify) are a
 | **Clone** | `git clone https://github.com/mafzalkalwardev/mailforge.git` |
 | **New PC setup** | [SETUP.md](SETUP.md) |
 | **Client install guide** | [client.md](client.md) |
+| **Portable package** | [PORTABLE_PACKAGE_NOTES.txt](PORTABLE_PACKAGE_NOTES.txt) |
 | **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | **Security** | [SECURITY.md](SECURITY.md) |
 | **Report bugs** | [Issues](https://github.com/mafzalkalwardev/mailforge/issues) |
