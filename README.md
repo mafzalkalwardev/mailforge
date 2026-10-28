@@ -2,28 +2,67 @@
 
 # MailForge
 
-**Verify. Send. Inbox.** — one private email operations dashboard.
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=700&size=28&duration=2800&pause=700&color=059669&center=true&vCenter=true&width=900&lines=Self-Hosted+Email+Operations+Platform;List+Verification+%2B+Multi-Sender+Campaigns;Reply+Management+%2B+Private+Workflows;Built+for+serious+outreach+teams" alt="Typing SVG" />
 
-Self-hosted list verification with **live SMTP proof**, multi-account campaigns, and a unified reply inbox.
+<p>
+  <img src="https://komarev.com/ghpvc/?username=mafzalkalwardev&label=Project%20Views&color=059669&style=for-the-badge" alt="Project views" />
+  <img src="https://img.shields.io/github/stars/mafzalkalwardev/mailforge?style=for-the-badge&color=22c55e" alt="GitHub stars" />
+  <img src="https://img.shields.io/github/forks/mafzalkalwardev/mailforge?style=for-the-badge&color=f59e0b" alt="GitHub forks" />
+  <img src="https://img.shields.io/github/license/mafzalkalwardev/mailforge?style=for-the-badge&color=64748b" alt="License" />
+</p>
 
-<br/>
+<p>
+  <img src="https://skillicons.dev/icons?i=go,nodejs,docker,postgres,react" alt="Skill icons" />
+</p>
 
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Go](https://img.shields.io/badge/Go-1.22-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
-[![Version](https://img.shields.io/badge/Version-1.4.2-blue?style=for-the-badge)](package.json)
-[![Docker](https://img.shields.io/badge/Reacher-Optional-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-[![Setup guide](https://img.shields.io/badge/Setup-SETUP.md-blue?style=for-the-badge)](SETUP.md)
-[![Contributing](https://img.shields.io/badge/Contributing-welcome-green?style=for-the-badge)](CONTRIBUTING.md)
-[![Packages](https://img.shields.io/badge/Packages-GHCR-purple?style=for-the-badge)](PACKAGES.md)
+<p>
+  <strong>Self-hosted email operations platform for list verification, multi-sender outreach campaigns, reply management, and private email workflow automation.</strong>
+</p>
 
 </div>
 
 ---
 
-> **Client Windows install?** Read **[client.md](client.md)**, place the client's `indus-license*.json` file beside `Client-Install-MailForge.bat`, then double-click `Client-Install-MailForge.bat`.
->
-> **Developer/new PC setup?** Follow **[SETUP.md](SETUP.md)** or run `npm run setup:new-pc` after cloning.
+## Trophy Cards
+
+<div align="center">
+  <img src="https://github-profile-trophy.vercel.app/?username=mafzalkalwardev&theme=algolia&no-frame=true&no-bg=true&margin-w=12&margin-h=12&column=4" alt="GitHub trophy cards" />
+</div>
+
+---
+
+## Stats Cards
+
+<div align="center">
+  <img height="165" src="https://github-readme-stats-sigma-five.vercel.app/api?username=mafzalkalwardev&show_icons=true&theme=tokyonight&hide_border=true&rank_icon=github" alt="GitHub stats" />
+  <img height="165" src="https://github-readme-stats-sigma-five.vercel.app/api/top-langs/?username=mafzalkalwardev&layout=compact&theme=tokyonight&hide_border=true" alt="Top languages" />
+</div>
+
+---
+
+## Activity Graph
+
+<div align="center">
+  <img src="https://github-readme-activity-graph.vercel.app/graph?username=mafzalkalwardev&theme=react-dark&hide_border=true&area=true" alt="GitHub activity graph" />
+</div>
+
+---
+
+## Contribution Snake
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mafzalkalwardev/google-voice-dispatch-agent/output/github-contribution-grid-snake-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mafzalkalwardev/google-voice-dispatch-agent/output/github-contribution-grid-snake.svg">
+    <img alt="Contribution snake" src="https://raw.githubusercontent.com/mafzalkalwardev/google-voice-dispatch-agent/output/github-contribution-grid-snake.svg">
+  </picture>
+</div>
+
+---
+
+## SEO Keywords
+
+`email verification` `SMTP campaigns` `self-hosted email` `outreach automation`
 
 ---
 
