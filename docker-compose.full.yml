@@ -1,6 +1,10 @@
 # MailForge full stack — MongoDB + app + optional Reacher verifier
-# Usage: docker compose -f docker-compose.full.yml up -d
+# Usage: docker compose -f docker-compose.full.yml up -d --build
 # App: http://localhost:5000
+#
+# This local stack sets MAILFORGE_DB_MODE=external so the app uses the mongo
+# service, and INDUS_SKIP_LICENSE=1 so it starts without a license file.
+# Windows client installs still require an indus-license*.json file.
 
 services:
   mongo:
@@ -36,12 +40,15 @@ services:
       - "5000:5000"
     environment:
       PORT: 5000
+      MAILFORGE_DB_MODE: external
       MONGO_URI: mongodb://mongo:27017/mailforge
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-in-production}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5000}
       VERIFIER_ENGINE: ${VERIFIER_ENGINE:-auto}
-      TRUEMAIL_GO_URL: ${TRUEMAIL_GO_URL:-http://host.docker.internal:8082}
+      GO_VERIFIER_URL: ${GO_VERIFIER_URL:-http://host.docker.internal:8082}
       REACHER_URL: http://reacher:8080
+      INDUS_SKIP_LICENSE: ${INDUS_SKIP_LICENSE:-1}
     depends_on:
       mongo:
         condition: service_healthy

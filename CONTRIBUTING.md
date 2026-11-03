@@ -19,12 +19,41 @@ Thank you for helping improve MailForge! This project welcomes bug fixes, docs, 
 
 ## Development setup
 
+Windows (checks Node, Docker, and Go, then starts MongoDB):
+
 ```powershell
 git clone https://github.com/YOUR_USERNAME/mailforge.git
 cd mailforge
 npm run setup:new-pc
 npm run dev
 ```
+
+Linux or macOS:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/mailforge.git
+cd mailforge
+cp .env.example .env
+```
+
+Set `JWT_SECRET` and `ENCRYPTION_KEY` in `.env` to long random strings, then:
+
+```bash
+npm install
+INDUS_SKIP_LICENSE=1 npm start
+```
+
+`INDUS_SKIP_LICENSE=1` is for local development. Client deliveries use an `indus-license*.json` file instead.
+
+App plus MongoDB in Docker:
+
+```bash
+docker compose -f docker-compose.full.yml up -d --build
+```
+
+`docker compose up -d` (no `-f`) starts only the optional Reacher verifier.
+
+Issue forms: [bug report](https://github.com/mafzalkalwardev/mailforge/issues/new?template=bug_report.md) and [feature request](https://github.com/mafzalkalwardev/mailforge/issues/new?template=feature_request.md).
 
 ## Code guidelines
 
