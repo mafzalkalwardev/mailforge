@@ -39,6 +39,10 @@ MailForge is for keeping the list, the SMTP check, and the replies on a machine 
 - Read and reply from the unified IMAP inbox. Sign-in uses JWT. The UI includes a dark theme.
 - Check `GET /api/health` for version, database, and verifier status, and `GET /api/backup/export` for a JSON download of your data.
 
+CSV imports detect comma, semicolon, or tab separators from the first row,
+ignoring those characters inside quoted header cells. Email addresses can be
+in any column; the original row cells are retained alongside verification results.
+
 ![Templates included with a new account](docs/screenshots/templates-live.png)
 
 Install details, environment variables, and the Windows desktop installer are in [SETUP.md](SETUP.md) and [client.md](client.md).
