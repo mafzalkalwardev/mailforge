@@ -22,7 +22,7 @@ Self-hosted email desk: verify a list over SMTP, send from your own accounts, an
 docker compose -f docker-compose.full.yml up -d --build
 ```
 
-Open **http://localhost:5000** and register. That command starts MongoDB and the web app. The compose file points the app at that MongoDB service and sets `INDUS_SKIP_LICENSE=1`, so a local stack starts without a license file. A Windows client install still expects `indus-license*.json`. See [client.md](client.md).
+Open **http://localhost:5000**. Logged-out visitors get the public landing page. **Log in** and **Get started** go to `/login` (use `/login?register=1` to open the registration form). A signed-in browser session goes straight to the dashboard. That command starts MongoDB and the web app. The compose file points the app at that MongoDB service and sets `INDUS_SKIP_LICENSE=1`, so a local stack starts without a license file. A Windows client install still expects `indus-license*.json`. See [client.md](client.md).
 
 `docker compose up -d` starts the optional Reacher verifier from [`docker-compose.yml`](docker-compose.yml). Use the full compose file above for the app.
 

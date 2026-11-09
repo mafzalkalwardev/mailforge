@@ -12,23 +12,37 @@ axios.interceptors.response.use(
     error => {
         if (error.response && error.response.status === 401) {
             const path = window.location.pathname;
-            if (path !== '/' && path !== '/index.html') {
+            if (!isPublicPage(path)) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = '/?expired=1';
+                window.location.href = '/login?expired=1';
             }
         }
         return Promise.reject(error);
     }
 );
 
+function isAuthScreen(pathname) {
+    return pathname === '/' ||
+        pathname === '' ||
+        pathname === '/index.html' ||
+        pathname === '/login' ||
+        pathname === '/login/' ||
+        pathname === '/login.html' ||
+        pathname === '/login/index.html';
+}
+
+function isPublicPage(pathname) {
+    return isAuthScreen(pathname) || pathname === '/unsubscribe.html';
+}
+
 function checkAuth() {
     const token = localStorage.getItem('token');
     const path = window.location.pathname;
 
-    if (!token && path !== '/' && path !== '/index.html') {
-        window.location.href = '/';
-    } else if (token && (path === '/' || path === '/index.html' || path === '')) {
+    if (!token && !isPublicPage(path)) {
+        window.location.href = '/login';
+    } else if (token && isAuthScreen(path)) {
         window.location.href = '/dashboard.html';
     }
 }
@@ -69,7 +83,7 @@ function updateThemeIcon() {
 function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/';
+    window.location.href = '/login';
 }
 
 function showToast(message, type = 'success') {

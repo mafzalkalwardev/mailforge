@@ -2,120 +2,787 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MailForge - Login</title>
-    <meta name="description" content="Self-hosted email verify, campaigns, and unified inbox.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MailForge — Email verification, campaigns, and inbox</title>
+    <meta name="description" content="Self-hosted email verification, cold email campaigns, and a unified inbox. Check a CSV over SMTP, send from your accounts, and read every reply.">
+    <meta name="author" content="INDUS Web Agency">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://mailforge.induswebagency.com/">
+    <meta name="theme-color" content="#312e81">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="manifest" href="/site.webmanifest">
-    <meta name="theme-color" content="#6366f1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/style.css">
-    <script src="/js/theme-init.js"></script>
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="MailForge">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:url" content="https://mailforge.induswebagency.com/">
+    <meta property="og:title" content="MailForge — Email verification, campaigns, and inbox">
+    <meta property="og:description" content="Self-hosted email verification, cold email campaigns, and a unified inbox from INDUS Web Agency.">
+    <meta property="og:image" content="https://mailforge.induswebagency.com/media/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="MailForge: verify lists, send campaigns, and read every reply. Made by INDUS Web Agency.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MailForge — Email verification, campaigns, and inbox">
+    <meta name="twitter:description" content="Self-hosted email verification, cold email campaigns, and a unified inbox from INDUS Web Agency.">
+    <meta name="twitter:image" content="https://mailforge.induswebagency.com/media/og.png">
+    <meta name="twitter:image:alt" content="MailForge: verify lists, send campaigns, and read every reply. Made by INDUS Web Agency.">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://induswebagency.com/#organization",
+          "name": "INDUS Web Agency",
+          "url": "https://induswebagency.com",
+          "brand": {
+            "@type": "Brand",
+            "name": "MailForge",
+            "url": "https://mailforge.induswebagency.com/"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://mailforge.induswebagency.com/#website",
+          "name": "MailForge",
+          "url": "https://mailforge.induswebagency.com/",
+          "inLanguage": "en",
+          "description": "Self-hosted email verification, cold email campaigns, and a unified inbox.",
+          "publisher": { "@id": "https://induswebagency.com/#organization" }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://mailforge.induswebagency.com/#app",
+          "name": "MailForge",
+          "applicationCategory": "BusinessApplication",
+          "applicationSubCategory": "Email verification and outreach",
+          "operatingSystem": "Web, self-hosted (Node.js)",
+          "softwareVersion": "1.4.2",
+          "url": "https://mailforge.induswebagency.com/",
+          "image": "https://mailforge.induswebagency.com/media/og.png",
+          "description": "MailForge verifies email addresses over SMTP, sends campaigns from accounts you connect, and syncs replies into one IMAP inbox. It is made by INDUS Web Agency and runs on a server you control.",
+          "publisher": { "@id": "https://induswebagency.com/#organization" },
+          "creator": { "@id": "https://induswebagency.com/#organization" },
+          "featureList": [
+            "Single and bulk email verification (CSV and XLSX)",
+            "Syntax, MX, SMTP, disposable, and role-account checks",
+            "Campaigns with multiple sender accounts, delays, scheduling, and warm-up",
+            "Templates, including freight dispatch copy",
+            "Suppression list and unsubscribe link",
+            "Unified IMAP inbox",
+            "History and CSV export",
+            "Settings and SMTP proxy"
+          ]
+        },
+        {
+          "@type": "BreadcrumbList",
+          "@id": "https://mailforge.induswebagency.com/#breadcrumb",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": "https://mailforge.induswebagency.com/"
+            }
+          ]
+        },
+        {
+          "@type": "HowTo",
+          "@id": "https://mailforge.induswebagency.com/#verify-list",
+          "name": "How to verify an email list with MailForge",
+          "description": "Upload a CSV or XLSX file to MailForge and export the rows whose mailboxes were confirmed over SMTP.",
+          "url": "https://mailforge.induswebagency.com/#verify",
+          "tool": [{ "@type": "HowToTool", "name": "MailForge" }],
+          "step": [
+            {
+              "@type": "HowToStep",
+              "position": 1,
+              "name": "Create an account",
+              "url": "https://mailforge.induswebagency.com/#verify",
+              "text": "Open Log in, choose Register, and create an account on your MailForge server. After sign-in you land on the dashboard."
+            },
+            {
+              "@type": "HowToStep",
+              "position": 2,
+              "name": "Upload the file",
+              "url": "https://mailforge.induswebagency.com/#verify",
+              "text": "Open Bulk Verify and upload a CSV or XLSX file. The email address can sit in any column. MailForge reads the file and starts a job on the server."
+            },
+            {
+              "@type": "HowToStep",
+              "position": 3,
+              "name": "Let the checks run",
+              "url": "https://mailforge.induswebagency.com/#verify",
+              "text": "Each address is checked for syntax, MX records, disposable and role-account flags, and a live SMTP RCPT dialog. You can leave the page. Pause or resume the job from Bulk Verify, and download rows before the job finishes."
+            },
+            {
+              "@type": "HowToStep",
+              "position": 4,
+              "name": "Export the result",
+              "url": "https://mailforge.induswebagency.com/#verify",
+              "text": "From History, download every row or only rows marked valid. Valid means the mailbox was confirmed over SMTP. A rejection such as 550, or a check that could not open SMTP, is not marked valid."
+            }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://mailforge.induswebagency.com/#faq",
+          "url": "https://mailforge.induswebagency.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is email verification?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Email verification checks whether an address is well formed and whether its mail server will accept it, before you send a campaign. MailForge does that on your server: syntax, MX lookup, disposable and role-account flags, and an SMTP conversation with the recipient server. It stores the server response instead of a score."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does MailForge check deliverability?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "MailForge checks the address and gives you sending controls. It does not promise inbox placement. truemail-go, or Reacher when that engine is selected or auto mode falls back, looks up MX records and opens an SMTP dialog: connect, EHLO, MAIL FROM, RCPT TO. The raw response is saved. SPF, DKIM, and DMARC for a mailbox you send from can be checked on the sender account. Sending speed is limited by per-account warm-up, a delay between messages, and an optional hourly cap."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is a catch-all email domain?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "A catch-all domain accepts mail for every local part, so a 250 response does not prove that one specific mailbox exists. MailForge runs the SMTP dialog with safe check enabled and keeps the server reply. If the server rejects the recipient, the address is not marked valid. If the server accepts it, MailForge records that acceptance, including on servers that accept unknown users. History styles a result labeled catch-all as a warning, the same way it styles a disposable address, rather than as a confirmed unique mailbox."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does MailForge detect disposable email addresses?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Disposable addresses are matched against a bundled list of temporary and throwaway domains, on the server, with no call to a verification SaaS. A match is reported on the result, counted on bulk jobs, and is not treated as a valid mailbox. Role accounts such as info@ or admin@ are flagged the same way. Known free providers are labeled, and that label alone does not make the address invalid."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can MailForge verify a bulk list from a CSV?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Bulk Verify accepts a CSV or XLSX file and finds the email address even when it is not in the first column. The job runs on the server, so you can leave the page, pause, or resume. You can download rows before the job finishes. History then exports every row or only the rows marked valid."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do MailForge campaigns avoid spam?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "MailForge does not bypass spam filters or guarantee delivery. It keeps a campaign from going out as one fast blast from a single mailbox. You can send only addresses marked valid, skip the suppression list, wait a random delay between messages (5 to 15 seconds by default), split the list across sender accounts, and cap each account with a warm-up schedule that starts at 20 messages a day and rises toward the account limit. A sender can be paused when its failure rate climbs (25% by default). Optional unsubscribe text and a postal footer can be added. You still need permission to email the list and working DNS authentication on the domain you send from."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does MailForge handle unsubscribe requests and GDPR?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "MailForge does not claim a GDPR certification. You host it, so lists, campaign history, sender credentials, and synced mail stay in MongoDB on your server and are not uploaded to a verification SaaS. If you turn the unsubscribe link on, each message can include a URL to /unsubscribe.html. Opening that link adds the address to the suppression list with reason unsubscribe, and later campaigns skip it. Bounces detected in the inbox can be suppressed too. Settings can append a physical postal address for CAN-SPAM. You remain the operator of the data."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+    <script>
+    try { if (localStorage.getItem('token')) location.replace('/dashboard.html'); } catch (e) {}
+    </script>
+    <style>
+        :root {
+            --ink: #16181d;
+            --muted: #3e4556;
+            --paper: #f4f2ec;
+            --card: #fffcf7;
+            --line: #e2ddd2;
+            --brand: #312e81;
+            --brand-2: #4338ca;
+            --soft: #ece9f8;
+            --max: 1120px;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: var(--paper);
+            font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+            font-size: 1.0625rem;
+            line-height: 1.6;
+            color-scheme: light;
+        }
+        img { max-width: 100%; height: auto; }
+        a { color: var(--brand); }
+        a:hover { color: var(--brand-2); }
+        :focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+        .skip {
+            position: absolute;
+            left: 12px;
+            top: -48px;
+            background: #fff;
+            color: var(--ink);
+            padding: 8px 12px;
+            z-index: 5;
+        }
+        .skip:focus { top: 12px; }
+        .wrap { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 4;
+            background: var(--paper);
+            border-bottom: 1px solid var(--line);
+        }
+        .header-inner {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px 20px;
+            min-height: 72px;
+            padding: 10px 0;
+        }
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--ink);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+        }
+        .brand:hover { color: var(--ink); }
+        .nav-toggle,
+        .nav-toggle-btn { display: none; }
+        .when-open { display: none; }
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 4px;
+        }
+        .nav a {
+            color: var(--ink);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.98rem;
+            padding: 10px 12px;
+            border-radius: 999px;
+        }
+        .nav a:hover { background: var(--soft); color: var(--brand); }
+        .nav a.btn,
+        .nav a.btn:hover {
+            color: #fff;
+            background: var(--brand);
+            font-weight: 700;
+        }
+        .nav a.btn:hover { background: #1e1b4b; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            background: var(--brand);
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+            border: 2px solid var(--brand);
+        }
+        .btn:hover { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
+        .btn.ghost {
+            background: transparent;
+            color: var(--brand);
+        }
+        .btn.ghost:hover { background: var(--soft); color: var(--brand); }
+        .nav .btn { margin-left: 6px; }
+        .hero { padding: 48px 0 24px; }
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr);
+            gap: 36px;
+            align-items: center;
+        }
+        .kicker {
+            margin: 0 0 10px;
+            color: var(--brand);
+            font-weight: 700;
+            font-size: 0.92rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        h1 {
+            margin: 0 0 18px;
+            font-size: clamp(2.1rem, 4.4vw, 3.35rem);
+            line-height: 1.08;
+            letter-spacing: -0.035em;
+        }
+        .hero h2 {
+            margin: 0 0 8px;
+            font-size: 1.15rem;
+        }
+        .lede { margin: 0 0 22px; color: var(--muted); font-size: 1.12rem; }
+        .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+        .checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+        .checks li {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+        figure { margin: 0; }
+        .frame {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 18px 40px rgba(22, 24, 29, 0.08);
+        }
+        .frame img { display: block; width: 100%; height: auto; }
+        figcaption { margin-top: 8px; color: var(--muted); font-size: 0.92rem; }
+        section { padding: 28px 0; }
+        h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); letter-spacing: -0.03em; line-height: 1.2; margin: 0 0 12px; }
+        h3 { font-size: 1.2rem; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.02em; }
+        .section-intro { max-width: 68ch; color: var(--muted); margin: 0 0 22px; }
+        .split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+            align-items: center;
+            margin: 28px 0;
+        }
+        .split.reverse { direction: rtl; }
+        .split.reverse > * { direction: ltr; }
+        .card-grid, .use-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        .card, .step, .use-grid article, .faq article {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+        }
+        .card, .use-grid article { padding: 18px 18px 8px; }
+        .card p, .use-grid p, .faq p, .step p { color: var(--muted); }
+        .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+        .step { display: grid; grid-template-columns: auto 1fr; gap: 14px; padding: 16px 18px; }
+        .step b {
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--soft);
+            color: var(--brand);
+        }
+        .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+        table { width: 100%; border-collapse: collapse; min-width: 560px; }
+        th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+        tr:last-child td, tr:last-child th { border-bottom: 0; }
+        th { width: 32%; color: var(--ink); }
+        td { color: var(--muted); }
+        .faq { display: grid; gap: 12px; }
+        .faq article { padding: 16px 18px 8px; }
+        .faq h3 { font-size: 1.12rem; }
+        .cta-band {
+            background: var(--brand);
+            color: #fff;
+            border-radius: 20px;
+            padding: 32px 28px;
+        }
+        .cta-band h2, .cta-band p { color: #fff; }
+        .cta-band p { max-width: 65ch; }
+        .cta-band .btn { background: #fff; color: var(--brand); border-color: #fff; }
+        .cta-band .btn:hover { background: var(--soft); }
+        .cta-band .btn.ghost { background: transparent; color: #fff; border-color: #fff; }
+        .cta-band .btn.ghost:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .site-footer { padding: 12px 0 40px; color: var(--muted); font-size: 0.98rem; }
+        .site-footer a { display: inline-block; padding: 6px 2px; }
+        .footer-grid { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; }
+        .crumbs { display: flex; gap: 8px; padding: 0; margin: 0 0 12px; list-style: none; font-size: 0.92rem; }
+        .crumbs a { color: var(--muted); }
+        @media (max-width: 900px) {
+            html { scroll-padding-top: 88px; }
+            .hero-grid, .split, .split.reverse, .card-grid, .use-grid { grid-template-columns: 1fr; direction: ltr; }
+            .hero { padding-top: 28px; }
+            .header-inner { flex-wrap: nowrap; }
+            .nav-toggle {
+                display: block;
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                margin: -1px;
+                padding: 0;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+            .nav-toggle-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 44px;
+                padding: 8px 16px;
+                border-radius: 999px;
+                border: 2px solid var(--brand);
+                color: var(--brand);
+                font-weight: 700;
+                background: transparent;
+            }
+            .nav-toggle:checked + .nav-toggle-btn .when-closed { display: none; }
+            .nav-toggle:checked + .nav-toggle-btn .when-open { display: inline; }
+            .nav-toggle:focus-visible + .nav-toggle-btn { outline: 3px solid var(--brand); outline-offset: 3px; }
+            .nav {
+                display: none;
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: 100%;
+                flex-direction: column;
+                align-items: flex-start;
+                background: var(--paper);
+                border-bottom: 1px solid var(--line);
+                padding: 8px 16px 16px;
+            }
+            .nav-toggle:checked ~ .nav { display: flex; }
+            .nav .btn { margin-left: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+        }
+    </style>
 </head>
 <body>
-    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
-
-    <div class="login-page">
-        <div class="glass-card p-5" style="width: 100%; max-width: 420px; z-index: 1; margin: 16px;">
-            <div class="text-center mb-4">
-                <img src="/favicon.svg" alt="" class="login-brand-icon" width="64" height="64">
-                <h2 class="gradient-text fw-bold mb-1">MailForge</h2>
-                <span class="engine-badge" data-engine-badge>truemail-go</span>
-                <p class="text-muted mt-3 mb-0 small">Verify lists · run campaigns · read every reply</p>
-            </div>
-
-            <form id="loginForm">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Email address</label>
-                    <input type="email" class="form-control" id="email" required placeholder="you@example.com">
-                </div>
-                <div class="mb-4">
-                    <label class="form-label fw-semibold">Password</label>
-                    <input type="password" class="form-control" id="password" required placeholder="Your password">
-                </div>
-                <button type="submit" class="btn btn-brand w-100 py-2">
-                    Sign In
-                </button>
-                <div class="text-center mt-3">
-                    <small class="text-muted">Need an account? <a href="#" id="toggleRegister" class="text-decoration-none">Register</a></small>
-                </div>
-            </form>
-
-            <form id="registerForm" class="d-none">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Name</label>
-                    <input type="text" class="form-control" id="regName" required placeholder="John Doe">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Email address</label>
-                    <input type="email" class="form-control" id="regEmail" required placeholder="you@example.com">
-                </div>
-                <div class="mb-4">
-                    <label class="form-label fw-semibold">Password</label>
-                    <input type="password" class="form-control" id="regPassword" required>
-                </div>
-                <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border: none; border-radius: 10px;">
-                    Create Account
-                </button>
-                <div class="text-center mt-3">
-                    <small class="text-muted">Already have an account? <a href="#" id="toggleLogin" class="text-decoration-none">Sign In</a></small>
-                </div>
-            </form>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="site-header">
+        <div class="wrap header-inner">
+            <a class="brand" href="/">
+                <img src="/favicon.svg" alt="" width="36" height="36">
+                MailForge
+            </a>
+            <input type="checkbox" id="nav-toggle" class="nav-toggle">
+            <label for="nav-toggle" class="nav-toggle-btn"><span class="when-closed">Menu</span><span class="when-open">Close</span></label>
+            <nav class="nav" aria-label="Primary">
+                <a href="#product">Features</a>
+                <a href="#verify">Verify a list</a>
+                <a href="#use-cases">Use cases</a>
+                <a href="#faq">FAQ</a>
+                <a href="/login">Log in</a>
+                <a class="btn" href="/login?register=1">Get started</a>
+            </nav>
         </div>
-    </div>
+    </header>
+    <main id="content">
+        <section class="hero">
+            <div class="wrap hero-grid">
+                <div>
+                    <p class="kicker">INDUS Web Agency</p>
+                    <h1>Verify a list, send the campaign, read every reply</h1>
+                    <h2 id="what-is-mailforge">What is MailForge?</h2>
+                    <p class="lede">MailForge is a self-hosted email desk made by INDUS Web Agency. It verifies addresses one at a time or from a CSV or spreadsheet, sends campaigns through SMTP accounts you connect, and collects replies in one inbox that syncs over IMAP. The application and its MongoDB data run on a server you control.</p>
+                    <div class="actions">
+                        <a class="btn" href="/login?register=1">Get started</a>
+                        <a class="btn ghost" href="/login">Log in</a>
+                    </div>
+                    <ul class="checks" aria-label="Checks MailForge runs">
+                        <li>Syntax</li>
+                        <li>MX records</li>
+                        <li>SMTP dialog</li>
+                        <li>Disposable domains</li>
+                        <li>Role accounts</li>
+                        <li>Catch-all responses</li>
+                    </ul>
+                </div>
+                <figure>
+                    <div class="frame">
+                        <picture>
+                            <source type="image/avif" srcset="/media/hero.avif">
+                            <source type="image/webp" srcset="/media/hero.webp">
+                            <img src="/media/hero.png" width="1280" height="800" alt="MailForge dashboard after sign-in, with shortcuts to add sender accounts, verify a contact list, create a campaign, and open the unified inbox." fetchpriority="high">
+                        </picture>
+                    </div>
+                    <figcaption>The dashboard after you sign in.</figcaption>
+                </figure>
+            </div>
+        </section>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="/js/engine-ui.js"></script>
-    <script src="/js/main.js"></script>
+        <section id="product" aria-labelledby="product-title">
+            <div class="wrap">
+                <h2 id="product-title">What MailForge does</h2>
+                <p class="section-intro">One server holds the list, the SMTP check, the campaign, and the replies. Nothing on this page is a score, a review, or a price.</p>
+
+                <div class="card-grid">
+                    <article class="card">
+                        <h3>Single and bulk verification</h3>
+                        <p>Check one address, or upload a CSV or XLSX. The email can sit in any column. truemail-go is the default engine: syntax, MX lookup, and a live SMTP RCPT dialog, with the server response saved. Disposable domains, role accounts, and known free providers are flagged from bundled lists. If auto mode is on and truemail-go is down, MailForge can fall back to Reacher. A row is valid only when SMTP confirms the mailbox.</p>
+                    </article>
+                    <article class="card">
+                        <h3>Campaigns, senders, and warm-up</h3>
+                        <p>Build a campaign from a verified list, a template, and one or more SMTP accounts. Set a delay (5 to 15 seconds by default), a per-sender cap, and an optional start time. Warm-up raises each account’s daily cap over 12 days, from 20 messages toward the account limit. A campaign can also mail the sender a short warm-up note before the list goes out. Recipients are split across the accounts you select.</p>
+                    </article>
+                    <article class="card">
+                        <h3>Templates</h3>
+                        <p>Templates store subject and body variants. Each send picks one of each at random. Merge fields cover name, email, state, sender, and company. New accounts include freight-dispatch copy: Freight Dispatch - INDUS Transports ships with 10 subjects and 10 bodies. If you save a Groq, OpenRouter, or OpenAI key in Settings, the template screen can draft copy. Verification does not use an LLM.</p>
+                    </article>
+                    <article class="card">
+                        <h3>Suppression list and unsubscribe</h3>
+                        <p>Suppressed addresses — manual blocks, imports, bounces, complaints, and unsubscribes — are skipped. Turn on the unsubscribe link and each message includes a URL to the public unsubscribe page. Opening it adds that address with reason unsubscribe. Bounces spotted in the inbox can be suppressed too. Settings can append a postal address for CAN-SPAM.</p>
+                    </article>
+                    <article class="card">
+                        <h3>Unified inbox</h3>
+                        <p>Each sender account syncs over IMAP into one inbox. Filter by account, unread, starred, important, or sent, search, and reply without leaving MailForge. Sent campaign messages show in the same place as the replies.</p>
+                    </article>
+                    <article class="card">
+                        <h3>History, exports, settings, and proxies</h3>
+                        <p>History keeps single checks and bulk jobs. Export a CSV of every row or only rows marked valid, including a partial file while a job is still running. Settings chooses the engine, hosted verifier URLs, bulk concurrency, and an SMTP proxy (such as SOCKS5) when port 25 is blocked. The same screen can download a JSON backup and check SPF, DKIM, and DMARC on a sender domain.</p>
+                    </article>
+                </div>
+
+                <div class="split">
+                    <figure>
+                        <div class="frame">
+                            <picture>
+                                <source type="image/avif" srcset="/media/templates.avif">
+                                <source type="image/webp" srcset="/media/templates.webp">
+                                <img src="/media/templates.png" width="1100" height="688" alt="Email templates page showing Follow-Up, Soft Introduction, and Freight Dispatch - INDUS Transports with 10 subjects and 10 bodies." loading="lazy" decoding="async">
+                            </picture>
+                        </div>
+                        <figcaption>Templates included with an account, including freight dispatch copy.</figcaption>
+                    </figure>
+                    <div>
+                        <h3>Start from copy that is already in the app</h3>
+                        <p>You do not begin with a blank editor. Freight, follow-up, and introduction templates are seeded for a new account. Edit them, or add your own, then attach one when you create a campaign.</p>
+                    </div>
+                </div>
+
+                <div class="split reverse">
+                    <figure>
+                        <div class="frame">
+                            <picture>
+                                <source type="image/avif" srcset="/media/inbox.avif">
+                                <source type="image/webp" srcset="/media/inbox.webp">
+                                <img src="/media/inbox.png" width="1100" height="688" alt="Unified inbox with the sender filter set to all accounts and buttons for unread, starred, and important mail." loading="lazy" decoding="async">
+                            </picture>
+                        </div>
+                        <figcaption>Replies from every connected mailbox, in one inbox.</figcaption>
+                    </figure>
+                    <div>
+                        <h3>Read the answer next to the send</h3>
+                        <p>IMAP sync pulls each account into a single list. Switch to one sender when you only want that mailbox, or keep “All accounts” when a campaign used several.</p>
+                    </div>
+                </div>
+
+                <div class="split">
+                    <figure>
+                        <div class="frame">
+                            <picture>
+                                <source type="image/avif" srcset="/media/senders.avif">
+                                <source type="image/webp" srcset="/media/senders.webp">
+                                <img src="/media/senders.png" width="1100" height="688" alt="Sender accounts page in dark mode, with add and bulk import for SMTP and IMAP mailboxes." loading="lazy" decoding="async">
+                            </picture>
+                        </div>
+                        <figcaption>Sender accounts, one at a time or from a CSV.</figcaption>
+                    </figure>
+                    <div>
+                        <h3>Mailboxes you already own</h3>
+                        <p>Add an account with its SMTP and IMAP hosts, or import a sheet of email, app password, and name. Each account has its own daily limit, warm-up day, and DNS check. MailForge sends as those accounts. It does not provide a shared sending pool.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="verify" aria-labelledby="verify-title">
+            <div class="wrap">
+                <h2 id="verify-title">How to verify an email list</h2>
+                <p class="section-intro">Four steps inside the app. The job keeps running on the server if you change pages.</p>
+                <ol class="steps">
+                    <li class="step">
+                        <b>1</b>
+                        <div>
+                            <h3>Create an account</h3>
+                            <p>Open Log in, choose Register, and create an account on your MailForge server. After sign-in you land on the dashboard.</p>
+                        </div>
+                    </li>
+                    <li class="step">
+                        <b>2</b>
+                        <div>
+                            <h3>Upload the file</h3>
+                            <p>Open Bulk Verify and upload a CSV or XLSX file. The email address can sit in any column. MailForge reads the file and starts a job on the server.</p>
+                        </div>
+                    </li>
+                    <li class="step">
+                        <b>3</b>
+                        <div>
+                            <h3>Let the checks run</h3>
+                            <p>Each address is checked for syntax, MX records, disposable and role-account flags, and a live SMTP RCPT dialog. You can leave the page. Pause or resume the job from Bulk Verify, and download rows before the job finishes.</p>
+                        </div>
+                    </li>
+                    <li class="step">
+                        <b>4</b>
+                        <div>
+                            <h3>Export the result</h3>
+                            <p>From History, download every row or only rows marked valid. Valid means the mailbox was confirmed over SMTP. A rejection such as 550, or a check that could not open SMTP, is not marked valid.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="use-cases" aria-labelledby="use-title">
+            <div class="wrap">
+                <h2 id="use-title">Who it is for</h2>
+                <p class="section-intro">The same three jobs — verify, send, read — show up in different desks. MailForge does not claim a customer count for any of them.</p>
+                <div class="use-grid">
+                    <article>
+                        <h3>Agencies</h3>
+                        <p>Connect each client’s mailboxes, keep a separate warm-up limit on each one, verify that client’s file, and read every reply in one inbox filtered by account.</p>
+                    </article>
+                    <article>
+                        <h3>Freight dispatch outreach</h3>
+                        <p>Start from the freight subject and body templates that ship with a new account. Merge name, state, sender, and company, then send only to addresses the verifier accepted.</p>
+                    </article>
+                    <article>
+                        <h3>Sales teams</h3>
+                        <p>Upload a list, drop syntax failures, disposable domains, and SMTP rejects, send from the mailboxes the team already uses, and answer from the unified inbox.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section aria-labelledby="compare-title">
+            <div class="wrap">
+                <h2 id="compare-title">One desk instead of three tools</h2>
+                <p class="section-intro">What you do in MailForge, and where it happens. This is the product, not a comparison against another vendor’s numbers.</p>
+                <div class="table-wrap">
+                    <table>
+                        <caption class="section-intro" style="caption-side: top; text-align: left; padding: 14px 16px 0;">Work you can finish without leaving the app</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Work</th>
+                                <th scope="col">In MailForge</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">Check one address</th>
+                                <td>Single Verify runs syntax, MX, disposable and role flags, and an SMTP dialog, then shows the server response.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Clean a file</th>
+                                <td>Bulk Verify takes CSV or XLSX, runs on the server, and can be paused. History exports all rows or valid rows only.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Send</th>
+                                <td>A campaign uses your accounts, a template, a delay, an optional schedule, and the suppression list.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Stop mailing someone</th>
+                                <td>Unsubscribe links, bounces, and manual blocks land on the suppression list. Later campaigns skip them.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Read the reply</th>
+                                <td>IMAP sync puts every connected mailbox in one inbox, with unread, starred, and sent mail.</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Leave with your data</th>
+                                <td>Export a CSV from History, or download a JSON backup from Settings.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="faq" aria-labelledby="faq-title">
+            <div class="wrap">
+                <h2 id="faq-title">Questions people ask</h2>
+                <div class="faq">
+                    <article>
+                        <h3>What is email verification?</h3>
+                        <p>Email verification checks whether an address is well formed and whether its mail server will accept it, before you send a campaign. MailForge does that on your server: syntax, MX lookup, disposable and role-account flags, and an SMTP conversation with the recipient server. It stores the server response instead of a score.</p>
+                    </article>
+                    <article>
+                        <h3>How does MailForge check deliverability?</h3>
+                        <p>MailForge checks the address and gives you sending controls. It does not promise inbox placement. truemail-go, or Reacher when that engine is selected or auto mode falls back, looks up MX records and opens an SMTP dialog: connect, EHLO, MAIL FROM, RCPT TO. The raw response is saved. SPF, DKIM, and DMARC for a mailbox you send from can be checked on the sender account. Sending speed is limited by per-account warm-up, a delay between messages, and an optional hourly cap.</p>
+                    </article>
+                    <article>
+                        <h3>What is a catch-all email domain?</h3>
+                        <p>A catch-all domain accepts mail for every local part, so a 250 response does not prove that one specific mailbox exists. MailForge runs the SMTP dialog with safe check enabled and keeps the server reply. If the server rejects the recipient, the address is not marked valid. If the server accepts it, MailForge records that acceptance, including on servers that accept unknown users. History styles a result labeled catch-all as a warning, the same way it styles a disposable address, rather than as a confirmed unique mailbox.</p>
+                    </article>
+                    <article>
+                        <h3>How does MailForge detect disposable email addresses?</h3>
+                        <p>Disposable addresses are matched against a bundled list of temporary and throwaway domains, on the server, with no call to a verification SaaS. A match is reported on the result, counted on bulk jobs, and is not treated as a valid mailbox. Role accounts such as info@ or admin@ are flagged the same way. Known free providers are labeled, and that label alone does not make the address invalid.</p>
+                    </article>
+                    <article>
+                        <h3>Can MailForge verify a bulk list from a CSV?</h3>
+                        <p>Yes. Bulk Verify accepts a CSV or XLSX file and finds the email address even when it is not in the first column. The job runs on the server, so you can leave the page, pause, or resume. You can download rows before the job finishes. History then exports every row or only the rows marked valid.</p>
+                    </article>
+                    <article>
+                        <h3>How do MailForge campaigns avoid spam?</h3>
+                        <p>MailForge does not bypass spam filters or guarantee delivery. It keeps a campaign from going out as one fast blast from a single mailbox. You can send only addresses marked valid, skip the suppression list, wait a random delay between messages (5 to 15 seconds by default), split the list across sender accounts, and cap each account with a warm-up schedule that starts at 20 messages a day and rises toward the account limit. A sender can be paused when its failure rate climbs (25% by default). Optional unsubscribe text and a postal footer can be added. You still need permission to email the list and working DNS authentication on the domain you send from.</p>
+                    </article>
+                    <article>
+                        <h3>How does MailForge handle unsubscribe requests and GDPR?</h3>
+                        <p>MailForge does not claim a GDPR certification. You host it, so lists, campaign history, sender credentials, and synced mail stay in MongoDB on your server and are not uploaded to a verification SaaS. If you turn the unsubscribe link on, each message can include a URL to /unsubscribe.html. Opening that link adds the address to the suppression list with reason unsubscribe, and later campaigns skip it. Bounces detected in the inbox can be suppressed too. Settings can append a physical postal address for CAN-SPAM. You remain the operator of the data.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section aria-labelledby="start-title">
+            <div class="wrap">
+                <div class="cta-band">
+                    <h2 id="start-title">Use MailForge on this server</h2>
+                    <p>There is no price list on this page. Create an account here, or talk to INDUS Web Agency about how you want it run. Signed-in sessions open the dashboard directly.</p>
+                    <div class="actions">
+                        <a class="btn" href="/login?register=1">Get started</a>
+                        <a class="btn ghost" href="https://induswebagency.com">Contact INDUS Web Agency</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="site-footer">
+        <div class="wrap">
+            <nav aria-label="Breadcrumb">
+                <ol class="crumbs">
+                    <li><a href="/" aria-current="page">Home</a></li>
+                </ol>
+            </nav>
+            <div class="footer-grid">
+                <p style="margin:0">© 2026 <a href="https://induswebagency.com">INDUS Web Agency</a>. MailForge is self-hosted.</p>
+                <nav aria-label="Footer">
+                    <a href="/login">Log in</a>
+                    ·
+                    <a href="/login?register=1">Get started</a>
+                    ·
+                    <a href="/llms.txt">llms.txt</a>
+                    ·
+                    <a href="/llms-full.txt">Full description</a>
+                    ·
+                    <a href="https://github.com/mafzalkalwardev/mailforge">Source</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
     <script>
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-
-        document.getElementById('toggleRegister').addEventListener('click', (e) => {
-            e.preventDefault();
-            loginForm.classList.add('d-none');
-            registerForm.classList.remove('d-none');
+    document.querySelectorAll('.nav a').forEach(function (link) {
+        link.addEventListener('click', function () {
+            var toggle = document.getElementById('nav-toggle');
+            if (toggle) toggle.checked = false;
         });
-
-        document.getElementById('toggleLogin').addEventListener('click', (e) => {
-            e.preventDefault();
-            registerForm.classList.add('d-none');
-            loginForm.classList.remove('d-none');
-        });
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const res = await axios.post('/api/auth/login', {
-                    email: document.getElementById('email').value,
-                    password: document.getElementById('password').value,
-                });
-                localStorage.setItem('token', res.data.token);
-                localStorage.setItem('user', JSON.stringify({ name: res.data.name, email: res.data.email }));
-                window.location.href = '/dashboard.html';
-            } catch (err) {
-                showToast(err.response?.data?.message || 'Login failed', 'error');
-            }
-        });
-
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const res = await axios.post('/api/auth/register', {
-                    name: document.getElementById('regName').value,
-                    email: document.getElementById('regEmail').value,
-                    password: document.getElementById('regPassword').value,
-                });
-                localStorage.setItem('token', res.data.token);
-                localStorage.setItem('user', JSON.stringify({ name: res.data.name, email: res.data.email }));
-                window.location.href = '/dashboard.html';
-            } catch (err) {
-                showToast(err.response?.data?.message || 'Registration failed', 'error');
-            }
-        });
+    });
     </script>
 </body>
 </html>

@@ -57,7 +57,47 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+const publicDir = path.join(__dirname, 'public');
+
+function sendPublicFile(res, filename, contentType) {
+    res.sendFile(path.join(publicDir, filename), {
+        headers: { 'Content-Type': contentType },
+    });
+}
+
+// Old login links used /?expired=1. The marketing page now lives at /.
+app.get('/', (req, res, next) => {
+    if (Object.prototype.hasOwnProperty.call(req.query, 'expired')) {
+        return res.redirect(302, '/login?expired=1');
+    }
+    return next();
+});
+
+app.get(['/login', '/login/'], (req, res) => {
+    sendPublicFile(res, 'login.html', 'text/html; charset=utf-8');
+});
+
+app.get('/favicon.ico', (req, res) => {
+    sendPublicFile(res, 'favicon.svg', 'image/svg+xml');
+});
+
+app.get('/robots.txt', (req, res) => {
+    sendPublicFile(res, 'robots.txt', 'text/plain; charset=utf-8');
+});
+
+app.get('/sitemap.xml', (req, res) => {
+    sendPublicFile(res, 'sitemap.xml', 'application/xml; charset=utf-8');
+});
+
+app.get(['/llms.txt', '/llms-full.txt'], (req, res) => {
+    sendPublicFile(res, req.path.slice(1), 'text/plain; charset=utf-8');
+});
+
+app.use('/media', express.static(path.join(publicDir, 'media'), {
+    maxAge: '7d',
+}));
+app.use(express.static(publicDir));
 app.use(async (req, res, next) => {
     try {
         await ensureStarted();

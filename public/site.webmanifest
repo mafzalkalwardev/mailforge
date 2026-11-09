@@ -1,8 +1,8 @@
 {
   "name": "MailForge",
   "short_name": "MailForge",
-  "description": "Verify. Send. Inbox.",
-  "start_url": "/dashboard.html",
+  "description": "Self-hosted email verification, cold email campaigns, and a unified inbox.",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#6366f1",
