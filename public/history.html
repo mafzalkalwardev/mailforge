@@ -161,15 +161,20 @@
 
         function isValidRecord(record) {
             const s = String(record.status || '').toLowerCase();
+            if (['invalid', 'unknown', 'no_smtp', 'risky', 'catch_all', 'disposable', 'error', 'fail'].includes(s)) return false;
             if (s === 'valid' || s === 'ok') return true;
-            return record.details?.report?.valid === true;
+            const report = record.details?.report;
+            if (!report || report.catch_all) return false;
+            const mailbox = String(report.mailbox_verified || '').toLowerCase();
+            if (mailbox !== 'yes') return false;
+            return report.valid === true;
         }
 
         function statusBadgeClass(record) {
             if (isValidRecord(record)) return 'bg-success';
             const s = String(record.status || '').toLowerCase();
             if (s === 'fail' || s === 'error' || s === 'invalid') return 'bg-danger';
-            if (s === 'disposable' || s === 'catch_all') return 'bg-warning text-dark';
+            if (s === 'disposable' || s === 'catch_all' || s === 'risky') return 'bg-warning text-dark';
             if (s === 'unknown' || s === 'no_smtp') return 'bg-secondary';
             return 'bg-danger';
         }

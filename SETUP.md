@@ -76,6 +76,16 @@ ENCRYPTION_KEY=replace_with_32_char_random_string
 MONGO_URI=mongodb://127.0.0.1:27017/mailforge
 ```
 
+On a host that blocks outbound port 25 (many cloud VMs), set a SOCKS5 proxy and the SMTP identity the Go verifier should present. Without a working path to port 25, MailForge reports `unknown` instead of `valid`.
+
+```env
+SMTP_PROXY=socks5://user:password@proxy-host:1080
+SMTP_HELO_HOST=mail.yourdomain.com
+SMTP_MAIL_FROM=verifier@yourdomain.com
+```
+
+`SMTP_HELO_NAME` is accepted as an alias of `SMTP_HELO_HOST`. A signed-in user can override `SMTP_PROXY` from Settings. The dashboard and Settings pages show a banner when the port 25 self-check fails.
+
 Generate secrets in PowerShell:
 
 ```powershell
