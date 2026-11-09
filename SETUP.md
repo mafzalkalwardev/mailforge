@@ -74,7 +74,14 @@ Edit `.env` before first production use:
 JWT_SECRET=replace_with_64_char_random_string
 ENCRYPTION_KEY=replace_with_32_char_random_string
 MONGO_URI=mongodb://127.0.0.1:27017/mailforge
+
+# Required on hosts that block outbound port 25. SOCKS5, used by the Go verifier.
+SMTP_PROXY=socks5://127.0.0.1:1080
+SMTP_HELO=mail.example.com
+SMTP_FROM=verifier@example.com
 ```
+
+`SMTP_HELO` is the EHLO/HELO name. `SMTP_FROM` is the MAIL FROM address. Per-user Settings can override `SMTP_PROXY`. If the proxy is down, or the exit IP is rejected (rDNS, Spamhaus, "No SMTP service"), checks come back **unknown**, not valid. A mailbox is **invalid** only for recipient replies such as `550 5.1.1`. Catch-all domains are **risky**. `GET /api/health` reports whether port 25 works directly or through the proxy.
 
 Generate secrets in PowerShell:
 

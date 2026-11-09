@@ -52,35 +52,42 @@ function mapReacherToReport(data, email) {
 
     const smtpRan = smtp.can_connect_smtp === true;
     const deliverable = smtp.is_deliverable === true;
+    const catchAll = smtp.is_catch_all === true;
     const reachable = data.is_reachable || 'unknown';
+    const smtpError = isErrorBlock(data.smtp);
 
-    if (smtpRan) {
+    if (smtpRan || smtpError) {
         checks.push({
             step: 'smtp',
-            passed: deliverable,
-            message: deliverable ? 'SMTP mailbox confirmed (Reacher)' : 'SMTP mailbox not confirmed (Reacher)',
-            detail: deliverable
-                ? '250 OK / is_deliverable'
-                : `is_reachable: ${reachable}`,
+            passed: deliverable && !catchAll && !smtpError,
+            message: catchAll
+                ? 'Domain accepts all recipients (catch-all)'
+                : deliverable
+                    ? 'SMTP mailbox confirmed (Reacher)'
+                    : 'SMTP mailbox not confirmed (Reacher)',
+            detail: `is_reachable: ${reachable}`,
         });
     }
 
     const domainValid = syntaxValid && mx.accepts_mail && !disposable;
 
-    let mailboxVerified = 'no_smtp';
-    if (reachable === 'safe' || deliverable) {
+    let mailboxVerified = 'unknown';
+    if (catchAll) {
+        mailboxVerified = 'catch_all';
+    } else if (smtpRan && deliverable) {
         mailboxVerified = 'yes';
     } else if (reachable === 'invalid' && smtpRan) {
         mailboxVerified = 'no';
-    } else if (smtpRan && !deliverable) {
-        mailboxVerified = 'no';
+    } else if (!smtpRan || smtpError) {
+        mailboxVerified = 'unknown';
     }
 
     const valid = mailboxVerified === 'yes';
     let verdictSummary = `${email} seems not to be valid`;
-    if (valid) verdictSummary = `${email} seems to be valid`;
-    else if (mailboxVerified === 'no_smtp' && domainValid) {
-        verdictSummary = `${email} — domain OK but mailbox could not be verified (SMTP blocked or unknown)`;
+    if (catchAll) verdictSummary = `${email} — domain accepts all recipients (catch-all / risky)`;
+    else if (valid) verdictSummary = `${email} seems to be valid`;
+    else if (!smtpRan || smtpError) {
+        verdictSummary = `${email} — SMTP port 25 unreachable from this server`;
     }
 
     return {
@@ -94,11 +101,16 @@ function mapReacherToReport(data, email) {
             disposable,
             role_account: !!misc.is_role_account,
             free_provider: false,
+            catch_all: catchAll,
         },
         smtp_host: mxRecords[0]?.host || '',
-        smtp_response: smtpRan
-            ? `is_reachable=${reachable}, is_deliverable=${deliverable}`
-            : '',
+        smtp_response: catchAll
+            ? 'catch-all'
+            : smtpError
+                ? 'SMTP port 25 unreachable from this server'
+                : (smtpRan || reachable)
+                    ? `is_reachable=${reachable}, is_deliverable=${deliverable}, is_catch_all=${catchAll}, can_connect_smtp=${smtpRan}`
+                    : '',
         verdict_summary: verdictSummary,
         syntax_valid: syntaxValid,
         smtp_check_ran: smtpRan,
@@ -124,7 +136,7 @@ async function verifyWithReacher(email, options = {}) {
     const proxy = options.smtpProxy || process.env.SMTP_PROXY;
     const body = {
         to_email: email,
-        hello_name: 'reacher.app',
+        hello_name: process.env.SMTP_HELO || process.env.SMTP_EHLO || 'mailforge.local',
     };
     if (proxy) {
         try {

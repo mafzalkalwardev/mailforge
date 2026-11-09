@@ -193,8 +193,8 @@
             return `<span class="badge ${val ? 'bg-success' : 'bg-danger'}">${val ? 'yes' : 'no'}</span>`;
         }
         function mailboxBadge(val) {
-            const map = { yes: 'bg-success', no: 'bg-danger', no_smtp: 'bg-warning text-dark', unknown: 'bg-secondary' };
-            const labels = { yes: 'yes', no: 'no', no_smtp: 'unavail', unknown: 'unknown' };
+            const map = { yes: 'bg-success', no: 'bg-danger', no_smtp: 'bg-warning text-dark', unknown: 'bg-secondary', catch_all: 'bg-warning text-dark' };
+            const labels = { yes: 'yes', no: 'no', no_smtp: 'unavail', unknown: 'unknown', catch_all: 'catch-all' };
             return `<span class="badge ${map[val] || 'bg-secondary'}">${labels[val] || val || '—'}</span>`;
         }
         function truncate(str, n = 48) {
