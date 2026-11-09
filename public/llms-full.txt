@@ -1,0 +1,112 @@
+# MailForge
+
+> MailForge is a self-hosted email desk made by INDUS Web Agency. It verifies email addresses, sends cold email campaigns from mailboxes you connect, and syncs replies into one IMAP inbox. The app and its MongoDB data run on a server you control.
+
+Production site: https://mailforge.induswebagency.com/
+Maker: INDUS Web Agency — https://induswebagency.com
+Log in: https://mailforge.induswebagency.com/login
+Create an account: https://mailforge.induswebagency.com/login?register=1
+Unsubscribe endpoint page: https://mailforge.induswebagency.com/unsubscribe.html
+Short description: https://mailforge.induswebagency.com/llms.txt
+Source repository: https://github.com/mafzalkalwardev/mailforge
+
+An sslip.io hostname may point at the same Express server as a temporary alias. The canonical site is https://mailforge.induswebagency.com/.
+
+MailForge does not publish customer counts, review scores, accuracy percentages, or prices. This file describes only behavior in the application.
+
+## What is MailForge?
+
+MailForge is a self-hosted email desk made by INDUS Web Agency. It verifies addresses one at a time or from a CSV or spreadsheet, sends campaigns through SMTP accounts you connect, and collects replies in one inbox that syncs over IMAP. The application and its MongoDB data run on a server you control.
+
+Signed-out visitors see the landing page at `/`. Log in and account creation live at `/login`. A browser that already has a session goes to the dashboard. Unsubscribe links of the form `/unsubscribe.html?token=...` stay public and do not require an account.
+
+## Verification
+
+The default engine is truemail-go. It checks syntax, looks up MX records, and opens a live SMTP dialog (connect, EHLO, MAIL FROM, RCPT TO) to the recipient server. The raw server response is stored. Disposable domains, role accounts (such as info@ or admin@), and known free providers are flagged from bundled lists, with no call to a paid verification API. If the engine mode is auto and truemail-go is down, MailForge can fall back to Reacher. Settings can point at a hosted verifier URL.
+
+An address is marked valid only when the mailbox is confirmed over SMTP. A rejection, including codes such as 550, is not valid. If SMTP could not run — port 25 blocked, proxy down, or a timeout — the mailbox stays unverified rather than valid.
+
+A catch-all domain accepts mail for every local part, so a 250 response does not prove one specific mailbox exists. MailForge runs that SMTP dialog with safe check enabled and keeps the server reply. A rejection is not marked valid. An acceptance is recorded as acceptance, including when a server accepts unknown users. History styles a result labeled catch-all as a warning, in the same way it styles a disposable address.
+
+## Bulk CSV and XLSX
+
+Bulk Verify accepts CSV and XLSX. The parser looks for an email address in any column, including comma, semicolon, and tab delimiters. The job runs on the server: you can leave the page, pause, resume, or stop it, and download rows before it finishes. History exports every row or only rows marked valid.
+
+## Campaigns, senders, and warm-up
+
+A campaign is built from a bulk job, a template, and one or more sender accounts. Suppressed addresses are removed. By default only rows marked valid are included. You can schedule a start time or start immediately.
+
+Each connected account is an SMTP and IMAP mailbox you add yourself (app password), or import from CSV/XLSX with email, app password, and optional name. Accounts have a daily limit (450 by default) and a warm-up ramp: when warm-up is on, the daily cap starts at 20 and steps up across 12 days (20, 40, 60, 80, 100, 150, 200, 250, 300, 350, 400, 450) without passing the account limit. A campaign option can also send a short warm-up message to the sender's own address before the list goes out.
+
+Sending waits a random delay between messages (5 to 15 seconds by default), splits recipients across the selected accounts, and can pause a sender when its failure rate reaches the threshold in Settings (25% by default). Settings also has an optional maximum sends per hour. None of this bypasses a spam filter. It slows the send and skips addresses you already know are bad. You still need permission to email the list, and DNS authentication (SPF, DKIM, DMARC) on the domain you send from. The sender screen can check those records.
+
+## Templates
+
+Templates hold one or more subjects and bodies. MailForge picks a subject and a body at random for each recipient. Merge fields are {Name}, {Email}, {State}, {SENDER_NAME}, {SENDER_EMAIL}, and {COMPANY_NAME}. New accounts are seeded with templates, including freight-dispatch subjects and bodies (the Freight Dispatch - INDUS Transports template has 10 subjects and 10 bodies). If a Groq, OpenRouter, or OpenAI key is saved in Settings, the template screen can draft copy. Verification itself does not use an LLM.
+
+## Suppression, unsubscribe, and the inbox
+
+The suppression list holds manual blocks, imports, bounces, unsubscribes, and complaints. Campaigns skip those addresses. If the campaign option is on, each message appends a link to `/unsubscribe.html?token=...`. That page posts the token to the public unsubscribe API and adds the address with reason unsubscribe. Bounces spotted during IMAP sync can be added with reason bounce. Settings can append a postal address footer for CAN-SPAM. There is no separate List-Unsubscribe header.
+
+The inbox syncs each sender account over IMAP into one view. You can filter by account, unread, starred, important, and sent, and you can reply from the app.
+
+## History, export, settings, proxies
+
+History keeps single-address checks and bulk jobs. Export writes a CSV of all rows or valid rows only. Settings can download a JSON backup of your data. The same screen sets the verifier engine, hosted truemail-go and Reacher URLs, bulk concurrency, timeout, and an SMTP proxy URL (for example a SOCKS5 proxy) used when outbound port 25 is blocked.
+
+## How to verify an email list
+
+1. Create an account. Open Log in, choose Register, and create an account on your MailForge server. After sign-in you land on the dashboard.
+2. Upload the file. Open Bulk Verify and upload a CSV or XLSX file. The email address can sit in any column. MailForge reads the file and starts a job on the server.
+3. Let the checks run. Each address is checked for syntax, MX records, disposable and role-account flags, and a live SMTP RCPT dialog. You can leave the page. Pause or resume the job from Bulk Verify, and download rows before the job finishes.
+4. Export the result. From History, download every row or only rows marked valid. Valid means the mailbox was confirmed over SMTP. A rejection such as 550, or a check that could not open SMTP, is not marked valid.
+
+## FAQ
+
+### What is email verification?
+
+Email verification checks whether an address is well formed and whether its mail server will accept it, before you send a campaign. MailForge does that on your server: syntax, MX lookup, disposable and role-account flags, and an SMTP conversation with the recipient server. It stores the server response instead of a score.
+
+### How does MailForge check deliverability?
+
+MailForge checks the address and gives you sending controls. It does not promise inbox placement. truemail-go, or Reacher when that engine is selected or auto mode falls back, looks up MX records and opens an SMTP dialog: connect, EHLO, MAIL FROM, RCPT TO. The raw response is saved. SPF, DKIM, and DMARC for a mailbox you send from can be checked on the sender account. Sending speed is limited by per-account warm-up, a delay between messages, and an optional hourly cap.
+
+### What is a catch-all email domain?
+
+A catch-all domain accepts mail for every local part, so a 250 response does not prove that one specific mailbox exists. MailForge runs the SMTP dialog with safe check enabled and keeps the server reply. If the server rejects the recipient, the address is not marked valid. If the server accepts it, MailForge records that acceptance, including on servers that accept unknown users. History styles a result labeled catch-all as a warning, the same way it styles a disposable address, rather than as a confirmed unique mailbox.
+
+### How does MailForge detect disposable email addresses?
+
+Disposable addresses are matched against a bundled list of temporary and throwaway domains, on the server, with no call to a verification SaaS. A match is reported on the result, counted on bulk jobs, and is not treated as a valid mailbox. Role accounts such as info@ or admin@ are flagged the same way. Known free providers are labeled, and that label alone does not make the address invalid.
+
+### Can MailForge verify a bulk list from a CSV?
+
+Yes. Bulk Verify accepts a CSV or XLSX file and finds the email address even when it is not in the first column. The job runs on the server, so you can leave the page, pause, or resume. You can download rows before the job finishes. History then exports every row or only the rows marked valid.
+
+### How do MailForge campaigns avoid spam?
+
+MailForge does not bypass spam filters or guarantee delivery. It keeps a campaign from going out as one fast blast from a single mailbox. You can send only addresses marked valid, skip the suppression list, wait a random delay between messages (5 to 15 seconds by default), split the list across sender accounts, and cap each account with a warm-up schedule that starts at 20 messages a day and rises toward the account limit. A sender can be paused when its failure rate climbs (25% by default). Optional unsubscribe text and a postal footer can be added. You still need permission to email the list and working DNS authentication on the domain you send from.
+
+### How does MailForge handle unsubscribe requests and GDPR?
+
+MailForge does not claim a GDPR certification. You host it, so lists, campaign history, sender credentials, and synced mail stay in MongoDB on your server and are not uploaded to a verification SaaS. If you turn the unsubscribe link on, each message can include a URL to /unsubscribe.html. Opening that link adds the address to the suppression list with reason unsubscribe, and later campaigns skip it. Bounces detected in the inbox can be suppressed too. Settings can append a physical postal address for CAN-SPAM. You remain the operator of the data.
+
+## Use cases
+
+- Agencies: connect each client's mailboxes, keep separate daily warm-up limits, verify that client's list, and read every reply in one inbox filtered by account.
+- Freight dispatch outreach: start from the freight subject and body templates shipped with a new account, merge in name, state, sender, and company, and send only to addresses the verifier accepted.
+- Sales teams: upload a list, drop syntax failures, disposable domains, and SMTP rejects, send from the mailboxes the team already uses, and answer from the unified inbox.
+
+## Routes a logged-out visitor can open
+
+- `GET /` landing page
+- `GET /login` and `GET /login/` and `GET /login.html` sign-in and registration
+- `GET /login?register=1` opens the registration form
+- `GET /?expired=1` redirects to `/login?expired=1` (older sessions used the home URL)
+- `GET /unsubscribe.html` public unsubscribe page
+- `GET /robots.txt` text/plain
+- `GET /sitemap.xml` application/xml
+- `GET /llms.txt` and `GET /llms-full.txt` text/plain
+- `POST /api/suppression/unsubscribe` public unsubscribe API used by that page
+
+Dashboard, verify, campaign, inbox, and other app screens require a signed-in session. Those HTML files redirect a logged-out browser to `/login`.

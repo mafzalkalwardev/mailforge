@@ -1,0 +1,43 @@
+# MailForge
+
+> MailForge is a self-hosted email desk made by INDUS Web Agency. It verifies email addresses, sends cold email campaigns from mailboxes you connect, and syncs replies into one IMAP inbox. The app and its MongoDB data run on a server you control.
+
+MailForge is not a hosted verification API and it does not publish customer counts, accuracy rates, or a price list on the public site. Create an account on the server where it is installed, or contact INDUS Web Agency.
+
+## Product
+
+- Name: MailForge
+- Maker: INDUS Web Agency (https://induswebagency.com)
+- Production site: https://mailforge.induswebagency.com/
+- Log in: https://mailforge.induswebagency.com/login
+- Create an account: https://mailforge.induswebagency.com/login?register=1
+- Public unsubscribe page: https://mailforge.induswebagency.com/unsubscribe.html
+- Longer description: https://mailforge.induswebagency.com/llms-full.txt
+
+## What it does
+
+- Single verification: syntax, MX records, disposable and role-account flags, and a live SMTP RCPT dialog. The server response is shown. truemail-go is the default engine. In auto mode, Reacher is the fallback when truemail-go is down.
+- Bulk verification: upload CSV or XLSX. The email can be in any column. The job runs on the server, can be paused or resumed, and rows can be downloaded before it finishes.
+- An address is marked valid only when the mailbox is confirmed over SMTP. A reject code, or a check that could not open SMTP, is not marked valid.
+- Campaigns: pick a verified list, one or more sender accounts, a template, a delay range, and an optional send time. Recipients on the suppression list are skipped.
+- Sender accounts: SMTP and IMAP credentials you add (or bulk-import). Each account has a daily limit and a warm-up ramp. A campaign can also send a warm-up message to the account itself before the list goes out.
+- Templates: subject and body variants, including freight-dispatch copy shipped with the app. Merge fields include name, email, state, sender, and company. A random subject and body are chosen per send. Optional draft help exists when a Groq, OpenRouter, or OpenAI key is saved in Settings.
+- Suppression and unsubscribe: manual blocks, imported addresses, detected bounces, and the public unsubscribe link. Later campaigns skip those addresses. An optional CAN-SPAM postal footer can be appended.
+- Unified inbox: IMAP sync across sender accounts, with unread, starred, important, and sent mail, plus reply.
+- History and export: per-address history and bulk-job CSV export (all rows or valid only). Settings can download a JSON backup.
+- Settings and proxies: engine choice, verifier URLs, bulk concurrency, an SMTP proxy URL for when port 25 is blocked, and SPF, DKIM, and DMARC checks on a sender domain.
+
+## Who it is for
+
+- Agencies running outreach from each client's own mailboxes, with separate warm-up limits and one inbox.
+- Freight dispatch desks. The app ships with freight subject and body templates.
+- Sales teams that want to verify a list, send from accounts they already own, and read the replies in one place.
+
+## Key URLs
+
+- https://mailforge.induswebagency.com/ — public landing page
+- https://mailforge.induswebagency.com/login — log in
+- https://mailforge.induswebagency.com/login?register=1 — create an account
+- https://mailforge.induswebagency.com/unsubscribe.html — unsubscribe link used in campaign mail
+- https://mailforge.induswebagency.com/llms-full.txt — full plain-text description and FAQ
+- https://induswebagency.com — INDUS Web Agency
