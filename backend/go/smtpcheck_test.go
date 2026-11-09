@@ -156,6 +156,24 @@ func TestSMTP554PTRIsUnknown(t *testing.T) {
 	}
 }
 
+func TestSMTP550OnCatchallNamedAddressIsInvalid(t *testing.T) {
+	addr, _ := startSMTP(t, func(line string) string {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "zzzcatchallprobe999") {
+			return "550 5.1.1 <zzzcatchallprobe999@proton.me>: Address does not exist"
+		}
+		return "250 2.1.5 OK"
+	})
+	host, _ := splitHost(addr)
+	result := checkMailbox("zzzcatchallprobe999@proton.me", []mxRecord{{Host: host, Priority: 1}}, optsFor(addr))
+	if result.Valid || result.CatchAll || result.MailboxVerified != "no" {
+		t.Fatalf("%+v", result)
+	}
+	if !strings.Contains(result.Response, "550") || !strings.Contains(result.Response, "does not exist") {
+		t.Fatalf("response %s", result.Response)
+	}
+}
+
 func TestSMTPCatchAllIsRisky(t *testing.T) {
 	addr, _ := startSMTP(t, func(string) string {
 		return "250 2.1.5 OK"

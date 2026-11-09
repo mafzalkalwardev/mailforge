@@ -117,7 +117,36 @@ test('IP block marks unknown not valid', () => {
     assert.equal(report.status, 'unknown');
 });
 
-test('catch-all is risky even when RCPT returned 250', () => {
+test('mailbox 550 wins over a catch-all flag, including when the address contains catchall', () => {
+    const report = applySmtpResponseRules({
+        email: 'zzzcatchallprobe999@proton.me',
+        valid: false,
+        mailbox_verified: 'catch_all',
+        status: 'risky',
+        misc: { catch_all: true },
+        smtp_response: '550 5.1.1 Address does not exist',
+    });
+    assert.equal(report.valid, false);
+    assert.equal(report.mailbox_verified, 'no');
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.misc.catch_all, false);
+    assert.equal(mapStatus(report), 'invalid');
+});
+
+test('550 that quotes a catchall-looking recipient is still invalid', () => {
+    const report = applySmtpResponseRules({
+        email: 'zzzcatchallprobe999@proton.me',
+        valid: true,
+        mailbox_verified: 'yes',
+        smtp_response: '550 5.1.1 <zzzcatchallprobe999@proton.me>: Address does not exist',
+    });
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.mailbox_verified, 'no');
+    assert.equal(report.valid, false);
+    assert.equal(mapStatus(report), 'invalid');
+});
+
+test('catch-all is risky only when the target RCPT was accepted', () => {
     const report = applySmtpResponseRules({
         email: 'someone@catch.example',
         valid: true,

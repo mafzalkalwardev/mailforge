@@ -30,13 +30,18 @@ function preview(text) {
     return `${one.slice(0, 180)}…`;
 }
 
-function isCatchAll(report, text) {
+function targetAccepted(text) {
+    return ACCEPT_RE.test(text) && !MAILBOX_RE.test(text) && !STRONG_POLICY_RE.test(text) && !POLICY_RE.test(text);
+}
+
+// Catch-all is only the case where the target RCPT was accepted and the engine
+// also accepted a random probe. The letters "catchall" inside an address or a
+// 550 line are not a signal.
+function isConfirmedCatchAll(report, text) {
+    if (!targetAccepted(text)) return false;
     if (report?.misc?.catch_all || report?.misc?.catchAll) return true;
     const mailbox = String(report?.mailbox_verified || '').toLowerCase();
-    if (mailbox === 'catch_all' || mailbox === 'catchall' || mailbox === 'accept_all' || mailbox === 'accept-all') return true;
-    const status = String(report?.status || '').toLowerCase();
-    if (status === 'risky' || status === 'catch_all' || status === 'catch-all') return true;
-    return /catch-?all|accept-?all/i.test(text);
+    return mailbox === 'catch_all' || mailbox === 'catchall' || mailbox === 'accept_all' || mailbox === 'accept-all';
 }
 
 function dialReason(text) {
@@ -70,6 +75,9 @@ function retargetSmtpChecks(checks, { passed, detail }) {
 
 function finish(report, patch) {
     const next = { ...report, ...patch };
+    if (next.mailbox_verified !== 'catch_all') {
+        next.misc = { ...(next.misc || {}), catch_all: false };
+    }
     if (patch.mailbox_verified !== 'yes') {
         next.checks = retargetSmtpChecks(report.checks, { passed: false, detail: next.smtp_response });
     } else if (patch.smtp_response) {
@@ -86,19 +94,7 @@ function applySmtpResponseRules(report) {
     const text = evidenceText(report);
     const lower = text.toLowerCase();
 
-    if (isCatchAll(report, text)) {
-        const response = rawSmtp || '250 OK';
-        return finish(report, {
-            valid: false,
-            mailbox_verified: 'catch_all',
-            status: 'risky',
-            smtp_response: response,
-            misc: { ...(report.misc || {}), catch_all: true },
-            verdict_summary: `${email} — domain accepts all recipients (catch-all / risky)`,
-        });
-    }
-
-    if (DIAL_RE.test(lower)) {
+    if (DIAL_RE.test(lower) && !STRONG_MAILBOX_RE.test(lower)) {
         const reason = dialReason(text);
         return finish(report, {
             valid: false,
@@ -155,6 +151,17 @@ function applySmtpResponseRules(report) {
         });
     }
 
+    if (isConfirmedCatchAll(report, lower)) {
+        return finish(report, {
+            valid: false,
+            mailbox_verified: 'catch_all',
+            status: 'risky',
+            smtp_response: rawSmtp || '250 OK',
+            misc: { ...(report.misc || {}), catch_all: true },
+            verdict_summary: `${email} — domain accepts all recipients (catch-all / risky)`,
+        });
+    }
+
     const reacherSmtp = report.reacher_raw?.smtp;
     const reacherProves = !!(
         reacherSmtp
@@ -193,6 +200,7 @@ function mapStatus(report) {
     const status = String(report.status || '').toLowerCase();
     if (status === 'pending') return 'pending';
     const mailbox = String(report.mailbox_verified || '').toLowerCase();
+    if (mailbox === 'no') return 'invalid';
     if (status === 'risky' || mailbox === 'catch_all' || report.misc?.catch_all) return 'risky';
     if (report.valid === true && mailbox === 'yes' && status !== 'unknown' && status !== 'risky') return 'valid';
     if (report.misc?.disposable) return 'disposable';

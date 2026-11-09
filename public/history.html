@@ -165,10 +165,11 @@
             const mailboxHit = /5\.1\.[0-3]|user unknown|unknown user|no such user|mailbox unavailable|mailbox not found|does not exist|no mailbox/.test(text);
             const policyHit = /no smtp service|dns ptr|invalid dns ptr|spamhaus|\bpbl\b|client host|access denied|blacklist|blocked|greylist|\b421\b|service unavailable/.test(text);
             const dialHit = /i\/o timeout|dial tcp|verification proxy offline|smtp port 25 unreachable|connection refused|connection reset/.test(text);
-            const catchAll = report.misc?.catch_all || report.mailbox_verified === 'catch_all' || String(record.status || '').toLowerCase() === 'risky';
-            if (catchAll) return 'risky';
+            if (mailboxHit && !policyHit) return 'invalid';
             if (dialHit || (policyHit && !mailboxHit)) return 'unknown';
-            if (mailboxHit) return 'invalid';
+            const accepted = /\b250\b/.test(text);
+            const catchAll = accepted && (report.misc?.catch_all || report.mailbox_verified === 'catch_all');
+            if (catchAll) return 'risky';
             const stored = String(record.status || report.status || 'unknown').toLowerCase();
             if (stored === 'ok') return 'valid';
             if (stored === 'valid' && report.mailbox_verified && report.mailbox_verified !== 'yes') return 'unknown';
