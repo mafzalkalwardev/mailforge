@@ -32,7 +32,7 @@ MailForge is for keeping the list, the SMTP check, and the replies on a machine 
 
 ## What you can do
 
-- Verify an address with syntax, MX, disposable and role checks, and a live SMTP RCPT dialog. truemail-go is the default. Set `VERIFIER_ENGINE=auto` to fall back to Reacher when the Go verifier is down.
+- Verify an address with syntax, MX, disposable and role checks, and a live SMTP RCPT dialog. truemail-go is the default and dials through `SMTP_PROXY` when outbound port 25 is blocked. A mailbox is valid only after RCPT TO is accepted. Timeouts, proxy outages, rDNS/Spamhaus policy replies, and greylisting stay **unknown**. Catch-all domains are **risky**. Set `VERIFIER_ENGINE=auto` to fall back to Reacher when the Go verifier is down.
 - Run a bulk CSV or XLSX job, pause or resume it, and download rows before it finishes.
 - Send a campaign through more than one account, with delays, warm-up fields, a suppression list, and an optional unsubscribe link.
 - Start from the templates shipped in the repo, including 10 freight subjects and 10 bodies, or draft copy when a Groq, OpenRouter, or OpenAI key is set.

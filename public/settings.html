@@ -341,10 +341,17 @@
                     const parts = [];
                     if (d.reacher) parts.push(`Reacher ${d.reacher_url || ''} online`);
                     if (d.go) parts.push(`truemail-go ${d.go_url || ''} online · SMTP port ${d.smtp_port || 25}`);
+                    const smtp = d.smtp;
+                    const smtpLine = !smtp
+                        ? ''
+                        : smtp.degraded
+                            ? `<br><strong class="text-warning">SMTP:</strong> ${smtp.port25?.reason || smtp.proxy?.reason || 'degraded'} (${smtp.port25?.via || 'direct'}${smtp.proxy?.endpoint ? `, proxy ${smtp.proxy.endpoint}` : ''}). Results stay unknown until RCPT TO is accepted.`
+                            : `<br><strong class="text-success">SMTP:</strong> port 25 reachable via ${smtp.port25?.via || 'direct'}${smtp.proxy?.endpoint ? ` (${smtp.proxy.endpoint})` : ''}.`;
                     detail.innerHTML = `
                         <strong>Mode:</strong> ${d.mode || 'auto'}${active ? ` — using <code>${active}</code>` : ''}.<br>
                         ${parts.join(' · ')}<br>
                         Live SMTP verification is ${d.go ? '<strong class="text-success">ready</strong>' : 'unavailable — start Go verifier with npm start'}.
+                        ${smtpLine}
                     `;
                 } else {
                     el.className = 'engine-status offline mb-3';

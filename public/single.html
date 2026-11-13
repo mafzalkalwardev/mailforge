@@ -296,16 +296,33 @@
             document.getElementById('emailDisplay').textContent = data.email;
             document.getElementById('verdictSummary').textContent = data.verdict_summary || '';
 
-            badge(document.getElementById('validBadge'),
-                data.valid ? 'Valid: YES' : 'Valid: NO',
-                data.valid ? 'bg-success' : 'bg-danger');
+            const status = String(data.status || '').toLowerCase();
+            let validText = 'Valid: NO';
+            let validCls = 'bg-danger';
+            if (status === 'risky' || data.mailbox_verified === 'catch_all') {
+                validText = 'Risky: catch-all';
+                validCls = 'bg-warning text-dark';
+            } else if (status === 'unknown' || data.mailbox_verified === 'unknown' || data.mailbox_verified === 'no_smtp') {
+                validText = 'Valid: UNKNOWN';
+                validCls = 'bg-secondary';
+            } else if (data.valid) {
+                validText = 'Valid: YES';
+                validCls = 'bg-success';
+            }
+            badge(document.getElementById('validBadge'), validText, validCls);
 
             badge(document.getElementById('domainBadge'),
                 data.domain_valid ? 'Domain: Valid' : 'Domain: Invalid',
                 data.domain_valid ? 'bg-success' : 'bg-danger');
 
-            const mbMap = { yes: ['Mailbox: Verified', 'bg-success'], no: ['Mailbox: Not verified', 'bg-danger'], no_smtp: ['Mailbox: SMTP unavailable', 'bg-warning text-dark'] };
-            const [mbText, mbCls] = mbMap[data.mailbox_verified] || mbMap.no_smtp;
+            const mbMap = {
+                yes: ['Mailbox: Verified', 'bg-success'],
+                no: ['Mailbox: Not verified', 'bg-danger'],
+                no_smtp: ['Mailbox: SMTP unavailable', 'bg-warning text-dark'],
+                unknown: ['Mailbox: Unknown', 'bg-secondary'],
+                catch_all: ['Mailbox: Catch-all', 'bg-warning text-dark'],
+            };
+            const [mbText, mbCls] = mbMap[data.mailbox_verified] || mbMap.unknown;
             badge(document.getElementById('mailboxBadge'), mbText, mbCls);
 
             const smtpBox = document.getElementById('smtpResponseBox');

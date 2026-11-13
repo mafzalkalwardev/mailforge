@@ -9,7 +9,7 @@ const {
 
 describe('bulkJobUtils', () => {
     const sampleRows = [
-        { email: 'a@test.com', valid: true, mailbox_verified: 'valid', status: 'ok' },
+        { email: 'a@test.com', valid: true, mailbox_verified: 'yes', status: 'valid', smtp_response: '250 2.1.5 OK' },
         { email: 'a@test.com', valid: false, mailbox_verified: 'invalid', status: 'invalid' },
         { email: 'info@corp.com', valid: false, mailbox_verified: 'invalid', status: 'disposable' },
         { email: 'b@test.com', valid: false, mailbox_verified: 'unknown', status: 'unknown' },
@@ -67,6 +67,19 @@ describe('bulkJobUtils', () => {
         assert.match(headerLine, /"verification_valid","verification_domain_valid","verification_mailbox_verified","verification_status","verification_smtp_response"$/);
         assert.ok(rowLine.startsWith('"MC-1778293","C&D PRIME LOGISTICS LLC","AL"'));
         assert.match(rowLine, /"yes","yes","yes","valid","250 OK"$/);
+    });
+
+    it('rowsToCsv reports a PTR 554 as unknown instead of invalid', () => {
+        const csv = rowsToCsv(['email'], [{
+            email: 'postmaster@gmx.net',
+            valid: false,
+            domain_valid: true,
+            mailbox_verified: 'no',
+            smtp_response: '554 No SMTP service Invalid DNS PTR resource record',
+            status: 'invalid',
+        }]);
+        assert.match(csv, /"unknown","unknown"/);
+        assert.doesNotMatch(csv, /"invalid"/);
     });
 
     it('rowsToCsv keeps original cells when rows have more columns than headers', () => {
