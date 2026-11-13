@@ -1,26 +1,29 @@
-// Axios default configuration — attach JWT to every request
-axios.interceptors.request.use(config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
-
-axios.interceptors.response.use(
-    response => response,
-    error => {
-        if (error.response && error.response.status === 401) {
-            const path = window.location.pathname;
-            if (path !== '/' && path !== '/index.html') {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.href = '/?expired=1';
-            }
+// Axios default configuration — attach JWT to every request.
+// The CDN script is optional; auth pages still run if it is blocked.
+if (typeof axios !== 'undefined') {
+    axios.interceptors.request.use(config => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
         }
-        return Promise.reject(error);
-    }
-);
+        return config;
+    });
+
+    axios.interceptors.response.use(
+        response => response,
+        error => {
+            if (error.response && error.response.status === 401) {
+                const path = window.location.pathname;
+                if (path !== '/' && path !== '/index.html') {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/?expired=1';
+                }
+            }
+            return Promise.reject(error);
+        }
+    );
+}
 
 function checkAuth() {
     const token = localStorage.getItem('token');
