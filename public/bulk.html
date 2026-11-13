@@ -193,9 +193,18 @@
             return `<span class="badge ${val ? 'bg-success' : 'bg-danger'}">${val ? 'yes' : 'no'}</span>`;
         }
         function mailboxBadge(val) {
-            const map = { yes: 'bg-success', no: 'bg-danger', no_smtp: 'bg-warning text-dark', unknown: 'bg-secondary' };
-            const labels = { yes: 'yes', no: 'no', no_smtp: 'unavail', unknown: 'unknown' };
+            const map = { yes: 'bg-success', no: 'bg-danger', no_smtp: 'bg-warning text-dark', unknown: 'bg-secondary', catch_all: 'bg-warning text-dark' };
+            const labels = { yes: 'yes', no: 'no', no_smtp: 'unavail', unknown: 'unknown', catch_all: 'catch-all' };
             return `<span class="badge ${map[val] || 'bg-secondary'}">${labels[val] || val || '—'}</span>`;
+        }
+        function resultBadge(item) {
+            if (item.catch_all || item.mailbox_verified === 'catch_all' || item.status === 'risky') {
+                return '<span class="badge bg-warning text-dark">risky</span>';
+            }
+            if (item.valid) return '<span class="badge bg-success">yes</span>';
+            const mv = String(item.mailbox_verified || item.status || '').toLowerCase();
+            if (mv === 'unknown' || mv === 'no_smtp') return '<span class="badge bg-secondary">unknown</span>';
+            return '<span class="badge bg-danger">no</span>';
         }
         function truncate(str, n = 48) {
             if (!str) return '—';
@@ -354,7 +363,7 @@
                 <td class="fw-medium">${item.email}</td>
                 <td>${ynBadge(item.domain_valid)}</td>
                 <td>${mailboxBadge(item.mailbox_verified)}</td>
-                <td>${ynBadge(item.valid)}</td>
+                <td>${resultBadge(item)}</td>
                 <td class="small text-muted" title="${item.smtp_response || ''}">${truncate(item.smtp_response)}</td>
             </tr>`).join('');
 

@@ -13,8 +13,12 @@ import (
 
 	emailVerifier "github.com/AfterShip/email-verifier"
 	"github.com/julienschmidt/httprouter"
-	"github.com/truemail-rb/truemail-go"
 )
+
+// The verifier does not use truemail SmtpSafeCheck. That flag treats connection
+// errors (including "dial tcp <mx>:25: i/o timeout") as a successful validation,
+// which this service then reported as "250 OK". A mailbox is valid only when an
+// MX accepts RCPT TO for that address and rejects a random probe.
 
 var miscVerifier = emailVerifier.NewVerifier()
 
@@ -41,6 +45,7 @@ type verifyResponse struct {
 	DomainValid     bool        `json:"domain_valid"`
 	MailboxVerified string      `json:"mailbox_verified"`
 	Valid           bool        `json:"valid"`
+	CatchAll        bool        `json:"catch_all,omitempty"`
 	Checks          []checkItem `json:"checks"`
 	MxRecords       []mxRecord  `json:"mx_records"`
 	Misc            miscInfo    `json:"misc"`
@@ -55,7 +60,7 @@ func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Mailforge-Smtp-Proxy, X-Mailforge-Smtp-Override, X-Mailforge-Helo-Host, X-Mailforge-Mail-From")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -81,21 +86,11 @@ func configuredSmtpPort() int {
 	return port
 }
 
-func buildConfiguration() (*truemail.Configuration, error) {
-	port := configuredSmtpPort()
-	return truemail.NewConfiguration(truemail.ConfigurationAttr{
-		VerifierEmail:         "verifier@example.com",
-		ValidationTypeDefault: "smtp",
-		ConnectionTimeout:     5,
-		ResponseTimeout:       10,
-		ConnectionAttempts:    2,
-		SmtpPort:              port,
-		SmtpFailFast:          true,
-		SmtpSafeCheck:         true,
-	})
-}
-
 func lookupMX(domain string) []mxRecord {
+	domain = asciiDomain(domain)
+	if domain == "" {
+		return nil
+	}
 	mx, err := net.LookupMX(domain)
 	if err != nil || len(mx) == 0 {
 		return nil
@@ -108,154 +103,32 @@ func lookupMX(domain string) []mxRecord {
 	return out
 }
 
-func isConnectionError(msg string) bool {
-	lower := strings.ToLower(msg)
-	return strings.Contains(lower, "connection") ||
-		strings.Contains(lower, "timeout") ||
-		strings.Contains(lower, "dial") ||
-		strings.Contains(lower, "refused") ||
-		strings.Contains(lower, "network") ||
-		strings.Contains(lower, "i/o")
-}
-
-func containsAny(lower string, phrases []string) bool {
-	for _, p := range phrases {
-		if strings.Contains(lower, p) {
-			return true
-		}
-	}
-	return false
-}
-
-func smtpResponseHasRejectCode(lower string) bool {
-	codes := []string{"550", "551", "552", "553", "554", "503", "521", "522", "571", "572"}
-	for _, c := range codes {
-		if strings.Contains(lower, c) {
-			return true
-		}
-	}
-	return false
-}
-
-// finalizeVerdict applies strict rules: SMTP 550/553/503 and IP-block messages are never "valid".
-func finalizeVerdict(email string, mailboxVerified string, smtpResponse string, domainValid bool) (string, bool, string) {
-	lower := strings.ToLower(strings.TrimSpace(smtpResponse))
-
-	if lower != "" {
-		has250 := strings.Contains(lower, "250")
-		hasReject := smtpResponseHasRejectCode(lower)
-		hasBlocked := containsAny(lower, []string{
-			"service unavailable", "access denied", "client host", "sender address rejected",
-			"does not accept mail", "nullmx", "blocked", "tss09", "tss11", "spamhaus",
-			"blacklist", "not permitted", "relay access denied",
-		})
-		hasMailboxGone := containsAny(lower, []string{
-			"user unknown", "mailbox not found", "does not exist", "no such user",
-			"invalid recipient", "recipient address rejected", "unknown user", "account disabled",
-		})
-
-		if has250 && !hasReject && !hasBlocked {
-			return "yes", true, email + " seems to be valid"
-		}
-
-		if hasReject || hasBlocked || hasMailboxGone {
-			mv := "no"
-			summary := email + " seems not to be valid"
-			if hasBlocked && !hasMailboxGone {
-				mv = "unknown"
-				summary = email + " — could not verify (mail server blocked our IP / sender)"
-			}
-			return mv, false, summary
-		}
-	}
-
-	valid := mailboxVerified == "yes"
-	summary := email + " seems to be valid"
-	if !valid {
-		summary = email + " seems not to be valid"
-	}
-	if mailboxVerified == "unknown" {
-		summary = email + " — could not verify (mail server blocked our IP / sender)"
-	}
-	if mailboxVerified == "no_smtp" && domainValid {
-		summary = email + " — domain OK but mailbox could not be verified (SMTP blocked or unavailable)"
-	}
-	return mailboxVerified, valid, summary
-}
-
-func extractSmtpErrors(result *truemail.ValidatorResult) (host, response string, rcptAttempted bool) {
-	for _, req := range result.SmtpDebug {
-		if req.Host != "" {
-			host = req.Host
-		}
-		if req.Response == nil {
-			continue
-		}
-		for _, e := range req.Response.Errors {
-			if e == nil {
-				continue
-			}
-			msg := e.Error()
-			rcptAttempted = true
-			if response == "" || !isConnectionError(msg) {
-				response = msg
-			}
-		}
-		if req.Response.Rcptto {
-			rcptAttempted = true
-		}
-	}
-	return host, response, rcptAttempted
-}
-
-func verifyEmailAddress(email string) (*verifyResponse, error) {
+func verifyEmailAddress(email string, settings smtpSettings) (*verifyResponse, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
-	cfg, err := buildConfiguration()
-	if err != nil {
-		return nil, err
+	domain := ""
+	if parts := strings.Split(email, "@"); len(parts) == 2 {
+		domain = parts[1]
 	}
 
-	result, err := truemail.Validate(email, cfg, "smtp")
-	if err != nil {
-		return nil, err
-	}
-
-	domain := result.Domain
-	if domain == "" {
-		parts := strings.Split(email, "@")
-		if len(parts) == 2 {
-			domain = parts[1]
-		}
-	}
-
-	mxRecords := lookupMX(domain)
 	checks := []checkItem{}
-
-	syntaxValid := true
-	if regexErr, ok := result.Errors["regex"]; ok {
-		syntaxValid = false
-		checks = append(checks, checkItem{
-			Step: "syntax", Passed: false,
-			Message: "The Email Address Syntax is incorrect",
-			Detail:  regexErr,
-		})
-	} else {
-		checks = append(checks, checkItem{
-			Step: "syntax", Passed: true,
-			Message: "The Email Address Syntax is correct",
-		})
-	}
-
+	syntaxValid := false
 	misc := miscInfo{}
 	if parsed := miscVerifier.ParseAddress(email); parsed.Valid {
+		syntaxValid = true
+		if parsed.Domain != "" {
+			domain = parsed.Domain
+		}
+		checks = append(checks, checkItem{Step: "syntax", Passed: true, Message: "The Email Address Syntax is correct"})
 		misc.Disposable = miscVerifier.IsDisposable(parsed.Domain)
 		misc.RoleAccount = miscVerifier.IsRoleAccount(parsed.Username)
 		misc.Free = miscVerifier.IsFreeDomain(parsed.Domain)
+	} else {
+		checks = append(checks, checkItem{Step: "syntax", Passed: false, Message: "The Email Address Syntax is incorrect"})
 	}
 
 	if misc.Disposable {
 		checks = append(checks, checkItem{Step: "misc", Passed: false, Message: "Disposable / temporary email domain detected"})
-	} else {
+	} else if syntaxValid {
 		checks = append(checks, checkItem{Step: "misc", Passed: true, Message: "Not a known disposable domain"})
 	}
 	if misc.RoleAccount {
@@ -265,8 +138,14 @@ func verifyEmailAddress(email string) (*verifyResponse, error) {
 		checks = append(checks, checkItem{Step: "misc", Passed: true, Message: "Known free email provider"})
 	}
 
+	var mxRecords []mxRecord
+	if syntaxValid && domain != "" {
+		mxRecords = lookupMX(domain)
+	}
 	domainValid := syntaxValid && len(mxRecords) > 0 && !misc.Disposable
-	if len(mxRecords) == 0 {
+	if !syntaxValid || domain == "" {
+		// syntax check already recorded
+	} else if len(mxRecords) == 0 {
 		checks = append(checks, checkItem{Step: "mx", Passed: false, Message: "No MX records found for domain"})
 	} else {
 		for _, mx := range mxRecords {
@@ -278,106 +157,76 @@ func verifyEmailAddress(email string) (*verifyResponse, error) {
 		}
 	}
 
-	smtpHost, smtpResponse, rcptAttempted := extractSmtpErrors(result)
-	smtpRan := len(result.SmtpDebug) > 0
-	mailboxVerified := "no_smtp"
-
-	if result.Success {
-		mailboxVerified = "yes"
-		if smtpResponse != "" && smtpResponseHasRejectCode(strings.ToLower(smtpResponse)) {
-			mailboxVerified = "no"
-		}
-		if smtpHost != "" {
-			checks = append(checks, checkItem{
-				Step: "smtp", Passed: true,
-				Message: fmt.Sprintf("Dialog with %s succeeded", smtpHost),
-				Detail:  "250 OK",
-			})
-		}
-	} else if smtpRan {
-		for _, req := range result.SmtpDebug {
-			host := req.Host
-			if host == "" {
-				continue
-			}
-			passed := req.Response != nil && req.Response.Rcptto
-			detail := ""
-			if req.Response != nil {
-				for _, e := range req.Response.Errors {
-					if e != nil {
-						detail = e.Error()
-					}
-				}
-			}
-			if passed {
-				checks = append(checks, checkItem{
-					Step: "smtp", Passed: true,
-					Message: fmt.Sprintf("Dialog with %s succeeded", host),
-					Detail:  "250 OK",
-				})
-			} else {
-				if detail == "" {
-					detail = "Mailbox not confirmed"
-				}
-				checks = append(checks, checkItem{
-					Step: "smtp", Passed: false,
-					Message: fmt.Sprintf("Dialog with %s", host),
-					Detail:  detail,
-				})
-			}
-		}
-
-		if rcptAttempted && smtpResponse != "" && !isConnectionError(smtpResponse) {
-			mailboxVerified = "no"
-		} else if rcptAttempted && strings.Contains(strings.ToLower(smtpResponse), "550") {
-			mailboxVerified = "no"
-		} else if _, smtpErr := result.Errors["smtp"]; smtpErr && rcptAttempted {
-			mailboxVerified = "no"
-		}
-	}
-
-	valid := mailboxVerified == "yes"
-	summary := email + " seems to be valid"
-	if !valid {
-		summary = email + " seems not to be valid"
-	}
-	if mailboxVerified == "no_smtp" && domainValid {
-		summary = email + " — domain OK but mailbox could not be verified (SMTP blocked or unavailable)"
-	}
-
-	mailboxVerified, valid, summary = finalizeVerdict(email, mailboxVerified, smtpResponse, domainValid)
-
-	return &verifyResponse{
+	resp := &verifyResponse{
 		Email:           email,
 		DomainValid:     domainValid,
-		MailboxVerified: mailboxVerified,
-		Valid:           valid,
+		MailboxVerified: "no_smtp",
+		Valid:           false,
 		Checks:          checks,
 		MxRecords:       mxRecords,
 		Misc:            misc,
-		SmtpHost:        smtpHost,
-		SmtpResponse:    smtpResponse,
-		VerdictSummary:  summary,
 		SyntaxValid:     syntaxValid,
-		SmtpCheckRan:    smtpRan,
-	}, nil
+		VerdictSummary:  email + " seems not to be valid",
+	}
+	if !syntaxValid {
+		resp.VerdictSummary = email + " — syntax is invalid"
+		return resp, nil
+	}
+	if len(mxRecords) == 0 {
+		resp.VerdictSummary = email + " — no MX records found"
+		return resp, nil
+	}
+
+	hosts := make([]string, 0, len(mxRecords))
+	for _, mx := range mxRecords {
+		if mx.Host != "" {
+			hosts = append(hosts, mx.Host)
+		}
+	}
+	verdict := verifyMailbox(email, domain, hosts, settings)
+	resp.SmtpHost = verdict.Host
+	resp.SmtpResponse = verdict.Response
+	resp.MailboxVerified = verdict.MailboxVerified
+	resp.Valid = verdict.Valid
+	resp.CatchAll = verdict.CatchAll
+	resp.SmtpCheckRan = verdict.Ran
+	resp.VerdictSummary = verdict.Summary
+	if verdict.CheckMessage != "" {
+		resp.Checks = append(resp.Checks, checkItem{
+			Step:    "smtp",
+			Passed:  verdict.CheckPassed,
+			Message: verdict.CheckMessage,
+			Detail:  verdict.CheckDetail,
+		})
+	}
+	return resp, nil
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	settings := smtpSettingsFromRequest(nil)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":    "ok",
-		"engine":    "truemail-go + AfterShip misc",
-		"smtp_port": configuredSmtpPort(),
+		"status":     "ok",
+		"engine":     "mailforge-smtp + AfterShip misc",
+		"smtp_port":  configuredSmtpPort(),
+		"smtp_proxy": strings.TrimSpace(os.Getenv("SMTP_PROXY")) != "",
+		"helo_host":  settings.HeloHost,
+		"mail_from":  settings.MailFrom,
+		"port25":     currentPort25(),
 	})
 }
 
-func singleHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
+func port25Handler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	settings := smtpSettingsFromRequest(r)
+	writeJSON(w, http.StatusOK, port25ForProxy(settings.ProxyURL))
+}
+
+func singleHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	email := ps.ByName("email")
 	if email == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email is required"})
 		return
 	}
-	resp, err := verifyEmailAddress(email)
+	resp, err := verifyEmailAddress(email, smtpSettingsFromRequest(r))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -395,9 +244,10 @@ func bulkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 		return
 	}
+	settings := smtpSettingsFromRequest(r)
 	results := make([]interface{}, 0, len(req.Emails))
 	for _, email := range req.Emails {
-		resp, err := verifyEmailAddress(email)
+		resp, err := verifyEmailAddress(email, settings)
 		if err != nil {
 			results = append(results, map[string]string{"email": email, "error": err.Error()})
 			continue
@@ -408,22 +258,24 @@ func bulkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func main() {
+	go warmPort25()
+
 	router := httprouter.New()
 	router.GET("/health", healthHandler)
+	router.GET("/port25", port25Handler)
 	router.GET("/v1/:email/verification", singleHandler)
 	router.POST("/v1/bulk/verification", bulkHandler)
 
-	server := &http.Server{
-		Addr:         ":8082",
-		Handler:      cors(router),
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 180 * time.Second,
-	}
 	addr := ":8082"
 	if p := os.Getenv("VERIFIER_GO_PORT"); p != "" {
 		addr = ":" + strings.TrimPrefix(p, ":")
 	}
-	log.Printf("Email verifier API (truemail-go) listening on %s", addr)
-	server.Addr = addr
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      cors(router),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 180 * time.Second,
+	}
+	log.Printf("Email verifier API (RCPT TO, proxy-aware) listening on %s", addr)
 	log.Fatal(server.ListenAndServe())
 }

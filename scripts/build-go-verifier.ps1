@@ -1,8 +1,15 @@
+param(
+    [string]$TargetOS = "windows",
+    [string]$TargetArch = "amd64"
+)
+
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = Split-Path -Parent $ScriptDir
 $GoDir = Join-Path $Root "backend\go"
-$Out = Join-Path $GoDir "verifier.exe"
+$OutName = "verifier.exe"
+if ($TargetOS -ne "windows") { $OutName = "verifier" }
+$Out = Join-Path $GoDir $OutName
 
 function Resolve-Go {
     $cmd = Get-Command go -ErrorAction SilentlyContinue
@@ -29,10 +36,13 @@ if (-not $GoExe) {
 
 Push-Location $GoDir
 try {
-    Write-Host "Building portable truemail-go verifier..."
+    Write-Host "Building portable verifier for $TargetOS/$TargetArch..."
     & $GoExe mod download
     if ($LASTEXITCODE -ne 0) { throw "go mod download failed" }
 
+    $env:GOOS = $TargetOS
+    $env:GOARCH = $TargetArch
+    $env:CGO_ENABLED = "0"
     & $GoExe build -trimpath -ldflags "-s -w" -o $Out .
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Out)) { throw "go build failed" }
 

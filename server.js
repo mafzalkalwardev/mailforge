@@ -6,6 +6,7 @@ const path = require('path');
 const connectDB = require('./config/db');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 const { ensureGoVerifier, stopGoVerifier } = require('./utils/spawnGo');
+const { notePort25OnStartup } = require('./utils/port25Check');
 const { resetEngineCache } = require('./utils/verificationEngine');
 const { startInboxSync, stopInboxSync } = require('./utils/imapSync');
 const { resumeInterruptedJobs } = require('./utils/bulkVerifyWorker');
@@ -29,6 +30,7 @@ async function start() {
     if (!IS_SERVERLESS) {
         console.log('Starting truemail-go verifier for local development...');
         await ensureGoVerifier();
+        notePort25OnStartup();
         console.log('Starting inbox sync worker...');
         startInboxSync();
         console.log('Starting campaign scheduler...');

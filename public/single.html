@@ -296,15 +296,23 @@
             document.getElementById('emailDisplay').textContent = data.email;
             document.getElementById('verdictSummary').textContent = data.verdict_summary || '';
 
-            badge(document.getElementById('validBadge'),
-                data.valid ? 'Valid: YES' : 'Valid: NO',
-                data.valid ? 'bg-success' : 'bg-danger');
+            const risky = data.catch_all || data.mailbox_verified === 'catch_all' || data.status === 'risky';
+            const inconclusive = data.mailbox_verified === 'unknown' || data.status === 'unknown' || data.mailbox_verified === 'no_smtp' || data.status === 'no_smtp';
+            const validText = risky ? 'Risky / catch-all' : data.valid ? 'Valid: YES' : inconclusive ? 'Valid: UNKNOWN' : 'Valid: NO';
+            const validClass = risky ? 'bg-warning text-dark' : data.valid ? 'bg-success' : inconclusive ? 'bg-secondary' : 'bg-danger';
+            badge(document.getElementById('validBadge'), validText, validClass);
 
             badge(document.getElementById('domainBadge'),
                 data.domain_valid ? 'Domain: Valid' : 'Domain: Invalid',
                 data.domain_valid ? 'bg-success' : 'bg-danger');
 
-            const mbMap = { yes: ['Mailbox: Verified', 'bg-success'], no: ['Mailbox: Not verified', 'bg-danger'], no_smtp: ['Mailbox: SMTP unavailable', 'bg-warning text-dark'] };
+            const mbMap = {
+                yes: ['Mailbox: Verified', 'bg-success'],
+                no: ['Mailbox: Not verified', 'bg-danger'],
+                unknown: ['Mailbox: Unknown', 'bg-secondary'],
+                catch_all: ['Mailbox: Risky / catch-all', 'bg-warning text-dark'],
+                no_smtp: ['Mailbox: SMTP unavailable', 'bg-warning text-dark'],
+            };
             const [mbText, mbCls] = mbMap[data.mailbox_verified] || mbMap.no_smtp;
             badge(document.getElementById('mailboxBadge'), mbText, mbCls);
 
