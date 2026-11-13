@@ -43,7 +43,7 @@
                 </div>
             </form>
 
-            <form id="registerForm" class="d-none">
+            <form id="registerForm" class="d-none" hidden>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Name</label>
                     <input type="text" class="form-control" id="regName" required placeholder="John Doe">
@@ -74,46 +74,95 @@
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
 
+        function setAuthFormVisible(form, visible) {
+            form.classList.toggle('d-none', !visible);
+            form.hidden = !visible;
+        }
+
+        function showRegister() {
+            setAuthFormVisible(loginForm, false);
+            setAuthFormVisible(registerForm, true);
+        }
+
+        function showLogin() {
+            setAuthFormVisible(registerForm, false);
+            setAuthFormVisible(loginForm, true);
+        }
+
         document.getElementById('toggleRegister').addEventListener('click', (e) => {
             e.preventDefault();
-            loginForm.classList.add('d-none');
-            registerForm.classList.remove('d-none');
+            showRegister();
         });
 
         document.getElementById('toggleLogin').addEventListener('click', (e) => {
             e.preventDefault();
-            registerForm.classList.add('d-none');
-            loginForm.classList.remove('d-none');
+            showLogin();
         });
+
+        async function postAuth(url, body) {
+            if (typeof axios !== 'undefined') {
+                const res = await axios.post(url, body);
+                return res.data;
+            }
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const error = new Error(data.message || 'Request failed');
+                error.response = { data };
+                throw error;
+            }
+            return data;
+        }
+
+        function notify(message, type) {
+            if (typeof showToast === 'function' && typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                showToast(message, type);
+                return;
+            }
+            const toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) return;
+            const el = document.createElement('div');
+            el.className = 'auth-toast ' + (type === 'error' ? 'auth-toast-error' : 'auth-toast-success');
+            el.setAttribute('role', 'alert');
+            el.textContent = message;
+            toastContainer.appendChild(el);
+            setTimeout(() => el.remove(), 3500);
+        }
+
+        function storeSession(data) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify({ name: data.name, email: data.email }));
+            window.location.href = '/dashboard.html';
+        }
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                const res = await axios.post('/api/auth/login', {
+                const data = await postAuth('/api/auth/login', {
                     email: document.getElementById('email').value,
                     password: document.getElementById('password').value,
                 });
-                localStorage.setItem('token', res.data.token);
-                localStorage.setItem('user', JSON.stringify({ name: res.data.name, email: res.data.email }));
-                window.location.href = '/dashboard.html';
+                storeSession(data);
             } catch (err) {
-                showToast(err.response?.data?.message || 'Login failed', 'error');
+                notify(err.response?.data?.message || 'Login failed', 'error');
             }
         });
 
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                const res = await axios.post('/api/auth/register', {
+                const data = await postAuth('/api/auth/register', {
                     name: document.getElementById('regName').value,
                     email: document.getElementById('regEmail').value,
                     password: document.getElementById('regPassword').value,
                 });
-                localStorage.setItem('token', res.data.token);
-                localStorage.setItem('user', JSON.stringify({ name: res.data.name, email: res.data.email }));
-                window.location.href = '/dashboard.html';
+                storeSession(data);
             } catch (err) {
-                showToast(err.response?.data?.message || 'Registration failed', 'error');
+                notify(err.response?.data?.message || 'Registration failed', 'error');
             }
         });
     </script>
