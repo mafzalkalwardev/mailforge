@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
+const fs = require('fs');
 const path = require('path');
 const connectDB = require('./config/db');
 const { errorHandler } = require('./middlewares/errorMiddleware');
@@ -57,7 +58,21 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+const publicDir = path.join(__dirname, 'public');
+const { version: appVersion } = require('./package.json');
+app.get(/\.html$/, (req, res, next) => {
+    const file = path.join(publicDir, req.path);
+    if (!file.startsWith(publicDir)) return next();
+    fs.readFile(file, 'utf8', (err, html) => {
+        if (err) return next();
+        res.type('html').send(
+            html
+                .replaceAll('__APP_VERSION__', appVersion)
+                .replace('</head>', `<meta name="mailforge-version" content="${appVersion}">\n</head>`)
+        );
+    });
+});
+app.use(express.static(publicDir));
 app.use(async (req, res, next) => {
     try {
         await ensureStarted();

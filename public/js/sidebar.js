@@ -1,6 +1,5 @@
 (function () {
     const BRAND = 'MailForge';
-    const APP_VERSION = '1.4.1';
     const NAV_ITEMS = [
         { href: '/dashboard.html', icon: 'fa-chart-pie', label: 'Dashboard' },
         { href: '/single.html', icon: 'fa-magnifying-glass', label: 'Single Verify' },
@@ -53,14 +52,16 @@
     }
 
     function renderFooter() {
+        const meta = document.querySelector('meta[name="mailforge-version"]');
+        const text = meta ? `Self-hosted · v${meta.content}` : 'Self-hosted';
         document.querySelectorAll('.sidebar-footer small').forEach(el => {
-            el.textContent = `Self-hosted · v${APP_VERSION}`;
+            el.textContent = text;
         });
         const sidebar = document.querySelector('.sidebar');
         if (sidebar && !sidebar.querySelector('.sidebar-footer')) {
             const footer = document.createElement('div');
             footer.className = 'sidebar-footer px-3 pb-3 mt-auto';
-            footer.innerHTML = `<small class="text-muted">Self-hosted · v${APP_VERSION}</small>`;
+            footer.innerHTML = `<small class="text-muted">${text}</small>`;
             sidebar.appendChild(footer);
         }
     }
