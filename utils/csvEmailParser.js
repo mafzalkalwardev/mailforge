@@ -11,9 +11,26 @@ function stripBom(text) {
 }
 
 function detectDelimiter(line) {
-    const commas = (line.match(/,/g) || []).length;
-    const semis = (line.match(/;/g) || []).length;
-    const tabs = (line.match(/\t/g) || []).length;
+    let commas = 0;
+    let semis = 0;
+    let tabs = 0;
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (!inQuotes) {
+            if (ch === ',') commas++;
+            else if (ch === ';') semis++;
+            else if (ch === '\t') tabs++;
+        }
+    }
+
     if (tabs >= commas && tabs >= semis && tabs > 0) return '\t';
     if (semis > commas) return ';';
     return ',';
