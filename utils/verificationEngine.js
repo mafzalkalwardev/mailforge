@@ -2,7 +2,8 @@ const axios = require('axios');
 const { mapReacherToReport, checkReacherHealth, REACHER_BASE } = require('./reacherClient');
 const { ensureGoVerifier } = require('./spawnGo');
 const { getSettingsForUser } = require('./settingsService');
-const { applySmtpResponseRules } = require('./smtpResponseRules');
+const { applySmtpResponseRules, mapStatus } = require('./smtpResponseRules');
+const { checkSmtpPath } = require('./smtpHealth');
 
 const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
@@ -33,40 +34,47 @@ async function settingsFor(userId) {
     return getSettingsForUser(userId);
 }
 
+function verifierRequestHeaders(settings = {}) {
+    const headers = {};
+    const proxy = String(settings.smtpProxy || process.env.SMTP_PROXY || '').trim();
+    if (proxy) headers['X-Mailforge-Smtp-Proxy'] = proxy;
+    const helo = String(process.env.SMTP_HELO || process.env.SMTP_EHLO || '').trim();
+    if (helo) headers['X-Mailforge-Smtp-Helo'] = helo;
+    const from = String(process.env.SMTP_FROM || process.env.VERIFIER_EMAIL || '').trim();
+    if (from) headers['X-Mailforge-Smtp-From'] = from;
+    return headers;
+}
+
 async function verifyWithGo(email, settings = {}) {
     const goBase = normalizeBase(settings.goVerifierUrl, defaultGoBase());
     const url = `${goBase}/v1/${encodeURIComponent(email)}/verification`;
-    const { data } = await axios.get(url, { timeout: 120000 });
+    const { data } = await axios.get(url, {
+        timeout: 120000,
+        headers: verifierRequestHeaders(settings),
+    });
     return { ...data, engine: data.engine || 'truemail-go' };
-}
-
-function mapStatus(report) {
-    if (report.valid) return 'valid';
-    if (report.misc?.disposable) return 'disposable';
-    if (report.mailbox_verified === 'unknown') return 'unknown';
-    if (report.mailbox_verified === 'no_smtp') return 'no_smtp';
-    if (!report.domain_valid) return 'invalid';
-    return 'invalid';
 }
 
 function wrapResult(report, email) {
     const normalized = applySmtpResponseRules({ ...report, email: report.email || email });
+    const status = mapStatus(normalized);
+    const stored = { ...normalized, status };
     return {
-        email: normalized.email || email,
-        domain_valid: normalized.domain_valid,
-        mailbox_verified: normalized.mailbox_verified,
-        valid: normalized.valid,
-        checks: normalized.checks || [],
-        mx_records: normalized.mx_records || [],
-        misc: normalized.misc || {},
-        smtp_host: normalized.smtp_host || '',
-        smtp_response: normalized.smtp_response || '',
-        verdict_summary: normalized.verdict_summary || '',
-        syntax_valid: normalized.syntax_valid,
-        smtp_check_ran: normalized.smtp_check_ran,
-        engine: normalized.engine || 'unknown',
-        status: mapStatus(normalized),
-        report: normalized,
+        email: stored.email || email,
+        domain_valid: stored.domain_valid,
+        mailbox_verified: stored.mailbox_verified,
+        valid: stored.valid,
+        checks: stored.checks || [],
+        mx_records: stored.mx_records || [],
+        misc: stored.misc || {},
+        smtp_host: stored.smtp_host || '',
+        smtp_response: stored.smtp_response || '',
+        verdict_summary: stored.verdict_summary || '',
+        syntax_valid: stored.syntax_valid,
+        smtp_check_ran: stored.smtp_check_ran,
+        engine: stored.engine || 'unknown',
+        status,
+        report: stored,
     };
 }
 
@@ -137,7 +145,10 @@ async function resolveEngine(userId) {
 }
 
 async function verifyWithReacherTimed(email, settings = {}) {
-    const body = { to_email: email, hello_name: 'reacher.app' };
+    const body = {
+        to_email: email,
+        hello_name: process.env.SMTP_HELO || process.env.SMTP_EHLO || 'mailforge.local',
+    };
     if (settings.smtpProxy) {
         try {
             const u = new URL(settings.smtpProxy);
@@ -216,6 +227,9 @@ async function checkBackendHealth(userId) {
     } catch (_) {}
 
     health.reacher = await checkReacherHealth(reacherUrl);
+    health.smtp = await checkSmtpPath({
+        proxy: settings.smtpProxy || process.env.SMTP_PROXY || '',
+    });
 
     try {
         health.active_engine = await resolveEngine(userId);
@@ -238,6 +252,7 @@ module.exports = {
     verifyEmailCombined,
     checkBackendHealth,
     verifyWithGo,
+    verifierRequestHeaders,
     GO_BASE: defaultGoBase(),
     mapStatus,
     resolveEngine,

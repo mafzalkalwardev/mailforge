@@ -74,6 +74,9 @@ async function getSettingsForUser(userId) {
     if (!saved) return defaults;
 
     const merged = { ...defaults, ...saved };
+    if (!String(saved.smtpProxy || '').trim()) {
+        merged.smtpProxy = defaults.smtpProxy;
+    }
     if (saved.bulkConcurrency === 3) {
         merged.bulkConcurrency = defaults.bulkConcurrency;
     }

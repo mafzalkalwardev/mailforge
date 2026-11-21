@@ -1,6 +1,7 @@
 const VerifyJob = require('../models/VerifyJob');
 const BulkJob = require('../models/BulkJob');
 const { verifyEmailCombined } = require('./verificationEngine');
+const { normalizeStoredRow } = require('./smtpResponseRules');
 const { getSettingsForUser } = require('./settingsService');
 const { sanitizeBulkConcurrency } = require('./concurrency');
 
@@ -8,27 +9,28 @@ const activeWorkers = new Map();
 
 function tallyResult(stats, result) {
     stats.completed++;
-    if (result.valid) {
+    const status = String(result.status || '').toLowerCase();
+    const mailbox = String(result.mailbox_verified || '').toLowerCase();
+    if (result.valid && (status === 'valid' || status === 'ok')) {
         stats.valid++;
         return;
     }
-    const status = String(result.status || '').toLowerCase();
     if (status === 'disposable' || result.misc?.disposable) stats.disposable++;
-    else if (result.mailbox_verified === 'unknown' || status === 'unknown') {
+    else if (mailbox === 'unknown' || status === 'unknown' || mailbox === 'no_smtp' || status === 'no_smtp') {
         stats.noSmtp = (stats.noSmtp || 0) + 1;
-    } else if (result.mailbox_verified === 'no_smtp' || status === 'no_smtp') stats.noSmtp++;
-    else stats.invalid++;
+    } else stats.invalid++;
 }
 
 function resultToRow(result, fileRow) {
+    const normalized = normalizeStoredRow(result);
     return {
         email: fileRow.email,
         originalRow: fileRow.originalRow || [],
-        valid: !!result.valid,
-        domain_valid: !!result.domain_valid,
-        mailbox_verified: result.mailbox_verified || 'no_smtp',
-        smtp_response: result.smtp_response || '',
-        status: result.status || (result.valid ? 'valid' : 'invalid'),
+        valid: !!normalized.valid,
+        domain_valid: !!normalized.domain_valid,
+        mailbox_verified: normalized.mailbox_verified || 'unknown',
+        smtp_response: normalized.smtp_response || '',
+        status: normalized.status || (normalized.valid ? 'valid' : 'unknown'),
     };
 }
 
@@ -58,9 +60,9 @@ async function saveToBulkHistory(job, { partial = false } = {}) {
     const stats = {
         total: rows.length,
         valid: completedRows.filter(r => r.valid).length,
-        invalid: completedRows.filter(r => !r.valid && !['unknown', 'no_smtp'].includes(String(r.mailbox_verified))).length,
+        invalid: completedRows.filter(r => !r.valid && !['unknown', 'no_smtp'].includes(String(r.mailbox_verified || '').toLowerCase()) && !['unknown', 'no_smtp'].includes(String(r.status || '').toLowerCase())).length,
         disposable: completedRows.filter(r => String(r.status).toLowerCase() === 'disposable').length,
-        noSmtp: completedRows.filter(r => ['unknown', 'no_smtp'].includes(String(r.mailbox_verified))).length,
+        noSmtp: completedRows.filter(r => ['unknown', 'no_smtp'].includes(String(r.mailbox_verified || '').toLowerCase()) || ['unknown', 'no_smtp'].includes(String(r.status || '').toLowerCase())).length,
     };
 
     const bulk = await BulkJob.create({
@@ -256,13 +258,14 @@ function buildRecentResults(job, limit = 30) {
     const recent = completed.slice(-limit);
     return recent.map(email => {
         const r = job.resultsByEmail[email];
+        const normalized = normalizeStoredRow(r);
         return {
             email,
-            domain_valid: !!r.domain_valid,
-            mailbox_verified: r.mailbox_verified || 'no_smtp',
-            valid: !!r.valid,
-            smtp_response: r.smtp_response || '',
-            status: r.status || 'unknown',
+            domain_valid: !!normalized.domain_valid,
+            mailbox_verified: normalized.mailbox_verified || 'unknown',
+            valid: !!normalized.valid,
+            smtp_response: normalized.smtp_response || '',
+            status: normalized.status || 'unknown',
         };
     }).reverse();
 }

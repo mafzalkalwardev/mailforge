@@ -1,6 +1,7 @@
 const { isPersistentStorage, isDbReady, getStorageMode, getStorageInfo } = require('../config/db');
 const mongoose = require('mongoose');
 const axios = require('axios');
+const { checkSmtpPath } = require('../utils/smtpHealth');
 
 async function pingUrl(url, timeoutMs = 3000) {
     if (!url) return { ok: false, error: 'not configured' };
@@ -17,7 +18,11 @@ const getHealth = async (req, res) => {
     const reacherUrl = process.env.REACHER_URL || 'http://localhost:8081';
     const storage = getStorageInfo();
 
-    const [go, reacher] = await Promise.all([pingUrl(goUrl), pingUrl(reacherUrl)]);
+    const [go, reacher, smtp] = await Promise.all([
+        pingUrl(goUrl),
+        pingUrl(reacherUrl),
+        checkSmtpPath(),
+    ]);
 
     res.json({
         status: 'ok',
@@ -39,6 +44,7 @@ const getHealth = async (req, res) => {
             truemailGo: go,
             reacher,
         },
+        smtp,
         uptimeSeconds: Math.round(process.uptime()),
     });
 };

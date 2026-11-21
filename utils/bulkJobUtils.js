@@ -1,3 +1,5 @@
+const { normalizeStoredRow } = require('./smtpResponseRules');
+
 const ROLE_PREFIXES = ['admin', 'info', 'support', 'sales', 'contact', 'hello', 'noreply', 'no-reply'];
 
 function analyzeListHygiene(rows, completedAt) {
@@ -11,13 +13,14 @@ function analyzeListHygiene(rows, completedAt) {
     let disposable = 0;
     let roleLike = 0;
 
-    for (const row of rows || []) {
+    for (const raw of rows || []) {
+        const row = normalizeStoredRow(raw);
         const email = String(row.email || '').toLowerCase();
         const local = email.split('@')[0] || '';
-        if (row.valid) valid += 1;
-        else if (['unknown', 'no_smtp'].includes(String(row.mailbox_verified || row.status || '').toLowerCase())) unknown += 1;
+        if (row.valid && String(row.status || '').toLowerCase() === 'valid') valid += 1;
+        else if (['unknown', 'no_smtp'].includes(String(row.mailbox_verified || '').toLowerCase()) || ['unknown', 'no_smtp'].includes(String(row.status || '').toLowerCase())) unknown += 1;
         else invalid += 1;
-        if (String(row.status || '').toLowerCase() === 'disposable') disposable += 1;
+        if (String(row.status || '').toLowerCase() === 'disposable' || String(raw.status || '').toLowerCase() === 'disposable') disposable += 1;
         if (ROLE_PREFIXES.some(p => local === p || local.startsWith(p + '.'))) roleLike += 1;
     }
 
@@ -104,7 +107,7 @@ function rowsToCsv(headers, rows) {
     ];
 
     const lines = [hdrs.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',')];
-    for (const row of rows) {
+    for (const row of (rows || []).map(normalizeStoredRow)) {
         const base = hasOriginalRows
             ? originalHeaders.map((_, i) => row.originalRow?.[i] ?? '')
             : [row.email || ''];

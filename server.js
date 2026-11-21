@@ -6,6 +6,7 @@ const path = require('path');
 const connectDB = require('./config/db');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 const { ensureGoVerifier, stopGoVerifier } = require('./utils/spawnGo');
+const { checkSmtpPath, formatSmtpPathLog } = require('./utils/smtpHealth');
 const { resetEngineCache } = require('./utils/verificationEngine');
 const { startInboxSync, stopInboxSync } = require('./utils/imapSync');
 const { resumeInterruptedJobs } = require('./utils/bulkVerifyWorker');
@@ -29,6 +30,11 @@ async function start() {
     if (!IS_SERVERLESS) {
         console.log('Starting truemail-go verifier for local development...');
         await ensureGoVerifier();
+        try {
+            console.log(formatSmtpPathLog(await checkSmtpPath()));
+        } catch (err) {
+            console.warn('SMTP path check failed:', err.message);
+        }
         console.log('Starting inbox sync worker...');
         startInboxSync();
         console.log('Starting campaign scheduler...');

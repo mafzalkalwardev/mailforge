@@ -159,23 +159,38 @@
         let currentPage = 1;
         const itemsPerPage = 15;
 
+        function shownStatus(record) {
+            const report = record.details?.report || {};
+            const text = String(report.smtp_response || record.smtp_response || '').toLowerCase();
+            const mailboxHit = /5\.1\.[0-3]|user unknown|unknown user|no such user|mailbox unavailable|mailbox not found|does not exist|no mailbox/.test(text);
+            const policyHit = /no smtp service|dns ptr|invalid dns ptr|spamhaus|\bpbl\b|client host|access denied|blacklist|blocked|greylist|\b421\b|service unavailable/.test(text);
+            const dialHit = /i\/o timeout|dial tcp|verification proxy offline|smtp port 25 unreachable|connection refused|connection reset/.test(text);
+            if (mailboxHit && !policyHit) return 'invalid';
+            if (dialHit || (policyHit && !mailboxHit)) return 'unknown';
+            const accepted = /\b250\b/.test(text);
+            const catchAll = accepted && (report.misc?.catch_all || report.mailbox_verified === 'catch_all');
+            if (catchAll) return 'risky';
+            const stored = String(record.status || report.status || 'unknown').toLowerCase();
+            if (stored === 'ok') return 'valid';
+            if (stored === 'valid' && report.mailbox_verified && report.mailbox_verified !== 'yes') return 'unknown';
+            return stored;
+        }
+
         function isValidRecord(record) {
-            const s = String(record.status || '').toLowerCase();
-            if (s === 'valid' || s === 'ok') return true;
-            return record.details?.report?.valid === true;
+            return shownStatus(record) === 'valid';
         }
 
         function statusBadgeClass(record) {
-            if (isValidRecord(record)) return 'bg-success';
-            const s = String(record.status || '').toLowerCase();
+            const s = shownStatus(record);
+            if (s === 'valid') return 'bg-success';
             if (s === 'fail' || s === 'error' || s === 'invalid') return 'bg-danger';
-            if (s === 'disposable' || s === 'catch_all') return 'bg-warning text-dark';
+            if (s === 'disposable' || s === 'catch_all' || s === 'risky') return 'bg-warning text-dark';
             if (s === 'unknown' || s === 'no_smtp') return 'bg-secondary';
             return 'bg-danger';
         }
 
         function statusLabel(record) {
-            return isValidRecord(record) ? 'VALID' : String(record.status || 'unknown').toUpperCase();
+            return shownStatus(record).toUpperCase();
         }
 
         function updateExportButtons() {

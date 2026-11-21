@@ -4,6 +4,7 @@ const VerifyJob = require('../models/VerifyJob');
 const Campaign = require('../models/Campaign');
 const { classifyHistoryRecord } = require('../utils/statusUtils');
 const { analyzeListHygiene, filterRowsForExport, rowsToCsv, dedupeRows } = require('../utils/bulkJobUtils');
+const { normalizeStoredRow } = require('../utils/smtpResponseRules');
 const { startVerifyJob } = require('../utils/bulkVerifyWorker');
 
 // @desc    Get user validation history
@@ -77,7 +78,9 @@ const getBulkJobById = async (req, res) => {
         if (!job) {
             return res.status(404).json({ message: 'Bulk job not found' });
         }
-        res.json(job);
+        const plain = job.toObject();
+        plain.rows = (plain.rows || []).map(normalizeStoredRow);
+        res.json(plain);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching bulk job', error: error.message });
     }
