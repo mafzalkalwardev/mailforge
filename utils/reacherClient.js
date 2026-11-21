@@ -51,10 +51,18 @@ function mapReacherToReport(data, email) {
     }
 
     const smtpRan = smtp.can_connect_smtp === true;
-    const deliverable = smtp.is_deliverable === true;
+    const catchAll = smtp.is_catch_all === true || data.is_catch_all === true;
+    const deliverable = smtp.is_deliverable === true && smtpRan && !catchAll;
     const reachable = data.is_reachable || 'unknown';
 
-    if (smtpRan) {
+    if (catchAll) {
+        checks.push({
+            step: 'smtp',
+            passed: false,
+            message: 'Domain is catch-all / accept-all (risky)',
+            detail: 'Reacher reported is_catch_all',
+        });
+    } else if (smtpRan) {
         checks.push({
             step: 'smtp',
             passed: deliverable,
@@ -63,23 +71,40 @@ function mapReacherToReport(data, email) {
                 ? '250 OK / is_deliverable'
                 : `is_reachable: ${reachable}`,
         });
+    } else if (syntaxValid && mx.accepts_mail) {
+        checks.push({
+            step: 'smtp',
+            passed: false,
+            message: 'SMTP port 25 unreachable from this server',
+            detail: 'SMTP port 25 unreachable from this server',
+        });
     }
 
     const domainValid = syntaxValid && mx.accepts_mail && !disposable;
+    const smtpUnreachable = !catchAll && !smtpRan && domainValid;
 
-    let mailboxVerified = 'no_smtp';
-    if (reachable === 'safe' || deliverable) {
+    let mailboxVerified = 'unknown';
+    let catchAllFlag = false;
+    if (catchAll) {
+        mailboxVerified = 'catch_all';
+        catchAllFlag = true;
+    } else if (!smtpRan) {
+        mailboxVerified = smtpUnreachable ? 'unknown' : 'no_smtp';
+    } else if (deliverable && reachable === 'safe') {
         mailboxVerified = 'yes';
-    } else if (reachable === 'invalid' && smtpRan) {
+    } else if (reachable === 'invalid') {
         mailboxVerified = 'no';
     } else if (smtpRan && !deliverable) {
-        mailboxVerified = 'no';
+        mailboxVerified = reachable === 'unknown' ? 'unknown' : 'no';
     }
 
     const valid = mailboxVerified === 'yes';
     let verdictSummary = `${email} seems not to be valid`;
-    if (valid) verdictSummary = `${email} seems to be valid`;
-    else if (mailboxVerified === 'no_smtp' && domainValid) {
+    if (catchAllFlag) verdictSummary = `${email} is risky/catch-all — the domain accepts every recipient`;
+    else if (valid) verdictSummary = `${email} seems to be valid`;
+    else if (!smtpRan && domainValid) {
+        verdictSummary = `${email} — SMTP port 25 unreachable from this server`;
+    } else if (mailboxVerified === 'unknown' && domainValid) {
         verdictSummary = `${email} — domain OK but mailbox could not be verified (SMTP blocked or unknown)`;
     }
 
@@ -96,12 +121,15 @@ function mapReacherToReport(data, email) {
             free_provider: false,
         },
         smtp_host: mxRecords[0]?.host || '',
-        smtp_response: smtpRan
-            ? `is_reachable=${reachable}, is_deliverable=${deliverable}`
-            : '',
+        smtp_response: catchAllFlag
+            ? 'catch-all'
+            : smtpRan
+                ? `is_reachable=${reachable}, is_deliverable=${deliverable}`
+                : (syntaxValid && mx.accepts_mail ? 'SMTP port 25 unreachable from this server' : ''),
         verdict_summary: verdictSummary,
         syntax_valid: syntaxValid,
         smtp_check_ran: smtpRan,
+        catch_all: catchAllFlag,
         engine: 'reacher',
         reacher_raw: data,
     };
@@ -122,10 +150,13 @@ async function checkReacherHealth(reacherUrl = REACHER_BASE) {
 
 async function verifyWithReacher(email, options = {}) {
     const proxy = options.smtpProxy || process.env.SMTP_PROXY;
+    const helo = String(process.env.SMTP_HELO_HOST || process.env.SMTP_HELO_NAME || '').trim();
+    const mailFrom = String(process.env.SMTP_MAIL_FROM || '').trim();
     const body = {
         to_email: email,
-        hello_name: 'reacher.app',
+        hello_name: helo || 'localhost',
     };
+    if (mailFrom) body.from_email = mailFrom;
     if (proxy) {
         try {
             const u = new URL(proxy);

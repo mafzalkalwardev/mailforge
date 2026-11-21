@@ -6,29 +6,40 @@ const { sanitizeBulkConcurrency } = require('./concurrency');
 
 const activeWorkers = new Map();
 
+function isDeliverableResult(result) {
+    const status = String(result?.status || '').toLowerCase();
+    const mailbox = String(result?.mailbox_verified || '').toLowerCase();
+    if (['unknown', 'risky', 'catch_all', 'no_smtp', 'invalid', 'disposable', 'error', 'fail'].includes(status)) {
+        return false;
+    }
+    if (result?.catch_all || ['unknown', 'catch_all', 'no', 'no_smtp'].includes(mailbox)) return false;
+    return result?.valid === true && mailbox === 'yes';
+}
+
 function tallyResult(stats, result) {
     stats.completed++;
-    if (result.valid) {
+    if (isDeliverableResult(result)) {
         stats.valid++;
         return;
     }
     const status = String(result.status || '').toLowerCase();
+    const mailbox = String(result.mailbox_verified || '').toLowerCase();
     if (status === 'disposable' || result.misc?.disposable) stats.disposable++;
-    else if (result.mailbox_verified === 'unknown' || status === 'unknown') {
+    else if (mailbox === 'unknown' || status === 'unknown' || mailbox === 'no_smtp' || status === 'no_smtp') {
         stats.noSmtp = (stats.noSmtp || 0) + 1;
-    } else if (result.mailbox_verified === 'no_smtp' || status === 'no_smtp') stats.noSmtp++;
-    else stats.invalid++;
+    } else stats.invalid++;
 }
 
 function resultToRow(result, fileRow) {
+    const deliverable = isDeliverableResult(result);
     return {
         email: fileRow.email,
         originalRow: fileRow.originalRow || [],
-        valid: !!result.valid,
+        valid: deliverable,
         domain_valid: !!result.domain_valid,
         mailbox_verified: result.mailbox_verified || 'no_smtp',
         smtp_response: result.smtp_response || '',
-        status: result.status || (result.valid ? 'valid' : 'invalid'),
+        status: result.status || (deliverable ? 'valid' : 'invalid'),
     };
 }
 
@@ -260,7 +271,8 @@ function buildRecentResults(job, limit = 30) {
             email,
             domain_valid: !!r.domain_valid,
             mailbox_verified: r.mailbox_verified || 'no_smtp',
-            valid: !!r.valid,
+            catch_all: r.catch_all === true || r.mailbox_verified === 'catch_all',
+            valid: isDeliverableResult(r),
             smtp_response: r.smtp_response || '',
             status: r.status || 'unknown',
         };
